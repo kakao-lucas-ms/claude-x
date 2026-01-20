@@ -3,6 +3,7 @@ name = "claude-x"
 version = "0.1.0"
 description = "Second Brain and Command Center for Claude Code"
 readme = "README.md"
+license = { text = "MIT" }
 authors = [
     { name = "lucas.ms(이문성)/kakao", email = "lucas.ms@kakaocorp.com" }
 ]
@@ -14,6 +15,32 @@ dependencies = [
     "watchdog>=6.0.0",
     "pydantic>=2.12.5",
 ]
+keywords = [
+    "claude",
+    "claude-code",
+    "ai",
+    "assistant",
+    "prompt-engineering",
+    "code-analysis",
+    "session-tracking",
+    "prompt-library",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
+
+[project.urls]
+Homepage = "https://github.com/YOUR-USERNAME/claude-x"
+Documentation = "https://github.com/YOUR-USERNAME/claude-x#readme"
+Repository = "https://github.com/YOUR-USERNAME/claude-x"
+Issues = "https://github.com/YOUR-USERNAME/claude-x/issues"
+Changelog = "https://github.com/YOUR-USERNAME/claude-x/blob/main/CHANGELOG.md"
 
 [project.scripts]
 cx = "claude_x.cli:main"
