@@ -1,0 +1,23 @@
+[project]
+name = "claude-x"
+version = "0.1.0"
+description = "Second Brain and Command Center for Claude Code"
+readme = "README.md"
+authors = [
+    { name = "lucas.ms(이문성)/kakao", email = "lucas.ms@kakaocorp.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "rich>=14.2.0",
+    "typer>=0.21.1",
+    "click>=8.1",
+    "watchdog>=6.0.0",
+    "pydantic>=2.12.5",
+]
+
+[project.scripts]
+cx = "claude_x.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
