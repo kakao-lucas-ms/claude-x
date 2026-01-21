@@ -1,12 +1,14 @@
 # Claude-X (cx)
 
 > **Second Brain and Command Center for Claude Code**
-> 
+>
 > Claude Code의 모든 대화 히스토리를 검색 가능한 데이터베이스로 전환하고,
 > 프롬프트 사용 패턴을 분석하여 개인 지식 자산으로 만드는 도구입니다.
 
-[![Python](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+**[🇰🇷 한국어](README.md) | [🇺🇸 English](README.en.md) | [⚡ Quick Start (EN)](QUICKSTART.en.md)**
 
 ## 🎯 주요 기능
 
