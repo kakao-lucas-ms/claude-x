@@ -8,7 +8,75 @@ from claude_x.scoring import (
     calculate_diversity_score,
     calculate_productivity_score,
     calculate_composite_score_v2,
+    detect_console_log_ratio,
+    calculate_context_dependency_penalty,
 )
+
+
+class TestConsoleLogDetection:
+    """Tests for detect_console_log_ratio function."""
+
+    def test_pure_console_log(self):
+        """Should detect console log output."""
+        prompt = """[Profile]  Page loaded: {profileId: '4z4z-newwwww', membershipContent: false}
+client-logger.ts:24 [Profile]  📊 State check {hasInitialized: true}
+logger-console.ts:19 [GET] /v2/article/@4z4z-newwwww"""
+        log_ratio, has_question = detect_console_log_ratio(prompt)
+        assert log_ratio > 0.5, f"Expected log_ratio > 0.5, got {log_ratio}"
+        assert not has_question, "Should not detect question"
+
+    def test_console_log_with_question(self):
+        """Should detect console log with question."""
+        prompt = """[Profile]  Page loaded: {profileId: '4z4z-newwwww'}
+client-logger.ts:24 [Profile]  📊 State check {hasInitialized: true}
+이게 왜 이렇게 되는 거야? 에러 원인이 뭘까?"""
+        log_ratio, has_question = detect_console_log_ratio(prompt)
+        assert log_ratio > 0.3, f"Expected log_ratio > 0.3, got {log_ratio}"
+        assert has_question, "Should detect question"
+
+    def test_normal_prompt(self):
+        """Should not detect console log in normal prompts."""
+        prompt = "LoginForm.tsx 컴포넌트에 validation 추가해줘"
+        log_ratio, has_question = detect_console_log_ratio(prompt)
+        assert log_ratio < 0.3, f"Expected log_ratio < 0.3, got {log_ratio}"
+
+    def test_empty_prompt(self):
+        """Should handle empty prompt."""
+        log_ratio, has_question = detect_console_log_ratio("")
+        assert log_ratio == 0.0
+        assert not has_question
+
+
+class TestContextDependencyPenalty:
+    """Tests for calculate_context_dependency_penalty function."""
+
+    def test_context_dependent_prompt(self):
+        """Should penalize context-dependent prompts."""
+        prompts = [
+            "위의 방법중 어떤게 좋아?",
+            "아까 말한 그거 해줘",
+            "그건 뭐야?",
+            "ㅇㅇ 그거",
+        ]
+        for prompt in prompts:
+            penalty = calculate_context_dependency_penalty(prompt)
+            assert penalty > 0, f"Prompt '{prompt}' should have penalty"
+
+    def test_independent_prompt(self):
+        """Should not penalize independent prompts."""
+        prompt = "LoginForm.tsx 컴포넌트에 validation을 추가해줘"
+        penalty = calculate_context_dependency_penalty(prompt)
+        assert penalty == 0.0, f"Expected 0.0 penalty, got {penalty}"
+
+    def test_very_short_context_dependent(self):
+        """Should heavily penalize very short context-dependent prompts."""
+        prompt = "그거 해줘"
+        penalty = calculate_context_dependency_penalty(prompt)
+        assert penalty >= 2.0, f"Expected >= 2.0 penalty, got {penalty}"
+
+    def test_empty_prompt(self):
+        """Should handle empty prompt."""
+        assert calculate_context_dependency_penalty("") == 0.0
 
 
 class TestStructureScore:
@@ -60,6 +128,33 @@ class TestStructureScore:
         for prompt in prompts:
             score = calculate_structure_score(prompt)
             assert score >= 2.0, f"Prompt '{prompt}' should have goal detected"
+
+    def test_console_log_only_prompt(self):
+        """Should give low score for console-log-only prompts."""
+        prompt = """[Profile]  Page loaded: {profileId: '4z4z-newwwww', membershipContent: false}
+client-logger.ts:24 [Profile]  📊 State check {hasInitialized: true}
+logger-console.ts:19 [GET] /v2/article/@4z4z-newwwww"""
+        score = calculate_structure_score(prompt)
+        assert score <= 2.0, f"Console log only should have low score, got {score}"
+
+    def test_console_log_with_question(self):
+        """Should give moderate score for logs with question (not a great template)."""
+        prompt = """[Profile]  Page loaded: {profileId: '4z4z-newwwww'}
+이 로그 보면 에러가 발생하는데 원인이 뭘까?"""
+        score = calculate_structure_score(prompt)
+        # Logs with question are better than logs alone, but still not great templates
+        assert 2.0 <= score <= 4.0, f"Logs with question should have moderate score, got {score}"
+
+    def test_context_dependent_prompt_penalized(self):
+        """Should penalize context-dependent prompts."""
+        prompts = [
+            "위의 방법중 어떤게 좋아?",
+            "아까 말한 그거 해줘",
+            "그건 뭐야?",
+        ]
+        for prompt in prompts:
+            score = calculate_structure_score(prompt)
+            assert score <= 4.0, f"Context-dependent '{prompt}' should have low score, got {score}"
 
 
 class TestContextScore:
@@ -124,18 +219,20 @@ class TestEfficiencyScore:
 
     def test_short_conversation(self):
         """Should give high score for short conversations."""
-        assert calculate_efficiency_score(5) == 10.0
-        assert calculate_efficiency_score(3) == 10.0
+        assert calculate_efficiency_score(2) == 10.0
+        assert calculate_efficiency_score(1) == 10.0
 
     def test_medium_conversation(self):
         """Should give medium score for medium conversations."""
-        assert calculate_efficiency_score(20) == 8.0
-        assert calculate_efficiency_score(50) == 5.0
+        assert calculate_efficiency_score(6) == 8.0
+        assert calculate_efficiency_score(10) == 7.0
+        assert calculate_efficiency_score(15) == 6.0
 
     def test_long_conversation(self):
         """Should give low score for long conversations."""
-        assert calculate_efficiency_score(100) == 3.0
-        assert calculate_efficiency_score(150) == 2.0
+        assert calculate_efficiency_score(60) == 3.0
+        assert calculate_efficiency_score(100) == 2.0
+        assert calculate_efficiency_score(150) == 1.0
 
 
 class TestDiversityScore:
