@@ -704,4 +704,4 @@ MIT License
 
 ---
 
-**Made with ❤️ by lucas.ms(이문성)/kakao**
+**Made with ❤️ by lucas.ms**

@@ -5,7 +5,7 @@ description = "Second Brain and Command Center for Claude Code"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
-    { name = "lucas.ms(이문성)/kakao", email = "lucas.ms@kakaocorp.com" }
+    { name = "lucas.ms", email = "karismalms@naver.com" }
 ]
 requires-python = ">=3.10"
 dependencies = [

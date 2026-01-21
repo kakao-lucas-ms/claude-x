@@ -297,6 +297,6 @@ Issues and suggestions: https://github.com/kakao/claude-x/issues
 
 ---
 
-**Made with ❤️ by lucas.ms (이문성)/kakao**
+**Made with ❤️ by lucas.ms**
 
 **For Claude Code Users**
