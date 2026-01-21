@@ -2,6 +2,13 @@
 
 All notable changes to Claude-X will be documented in this file.
 
+## [0.1.1] - 2026-01-21
+
+### Changed
+- Use the first user message (with command-args when present) for prompt analysis.
+- Filter command-only prompts (e.g. /clear, /model) from prompt rankings.
+- Add configurable prompt preview length for `cx prompts`.
+
 ## [0.1.0] - 2026-01-20
 
 ### 🎉 Initial Release
