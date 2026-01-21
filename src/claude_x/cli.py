@@ -580,6 +580,8 @@ def prompts(
     worst_only: bool = typer.Option(False, "--worst-only", help="Show only worst prompts"),
     limit: int = typer.Option(10, "--limit", "-l", help="Number of prompts to show"),
     prompt_length: int = typer.Option(120, "--prompt-length", help="Max prompt preview length"),
+    include_nocode: bool = typer.Option(False, "--include-nocode", help="Include sessions without code"),
+    include_commands: bool = typer.Option(False, "--include-commands", help="Include command-only prompts"),
     export: bool = typer.Option(False, "--export", "-e", help="Export to markdown file"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Custom output path for markdown")
 ):
@@ -617,9 +619,19 @@ def prompts(
         task = progress.add_task("Analyzing prompt quality...", total=None)
 
         if not worst_only:
-            best = analytics.get_best_prompts(project, limit)
+            best = analytics.get_best_prompts(
+                project,
+                limit,
+                include_nocode=include_nocode,
+                include_commands=include_commands
+            )
         if not best_only:
-            worst = analytics.get_worst_prompts(project, limit)
+            worst = analytics.get_worst_prompts(
+                project,
+                limit,
+                include_nocode=include_nocode,
+                include_commands=include_commands
+            )
 
         progress.update(task, description="✅ Analysis complete")
 

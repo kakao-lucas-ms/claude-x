@@ -288,7 +288,12 @@ class PromptAnalytics:
             writer.writeheader()
             writer.writerows(data)
 
-    def analyze_prompt_quality(self, project_name: str = "front") -> List[Dict]:
+    def analyze_prompt_quality(
+        self,
+        project_name: str = "front",
+        include_nocode: bool = False,
+        include_commands: bool = False
+    ) -> List[Dict]:
         """Analyze prompt quality with scoring.
 
         Args:
@@ -298,52 +303,64 @@ class PromptAnalytics:
             List of prompts with quality scores
         """
         with self.storage._get_connection() as conn:
-            cursor = conn.execute("""
-                WITH base_metrics AS (
+            query = """
+                WITH user_prompts AS (
                     SELECT
-                        s.session_id,
-                        COALESCE(
-                            (
-                                SELECT content
-                                FROM messages m_first
-                                WHERE m_first.session_id = s.session_id
-                                  AND m_first.type = 'user'
-                                  AND instr(m_first.content, '<command-args>') > 0
-                                ORDER BY m_first.timestamp ASC
-                                LIMIT 1
-                            ),
-                            (
-                                SELECT content
-                                FROM messages m_first
-                                WHERE m_first.session_id = s.session_id
-                                  AND m_first.type = 'user'
-                                ORDER BY m_first.timestamp ASC
-                                LIMIT 1
-                            ),
-                            s.first_prompt
-                        ) as prompt_text,
+                        m.id as message_id,
+                        m.session_id,
+                        m.content as prompt_text,
+                        m.timestamp as prompt_ts,
                         s.git_branch,
                         s.created_at,
-                        COUNT(DISTINCT m.id) as message_count,
-                        COUNT(DISTINCT CASE WHEN m.type = 'user' THEN m.id END) as user_prompt_count,
+                        LEAD(m.timestamp) OVER (
+                            PARTITION BY m.session_id
+                            ORDER BY m.timestamp
+                        ) as next_user_ts
+                    FROM messages m
+                    JOIN sessions s ON m.session_id = s.session_id
+                    JOIN projects p ON s.project_id = p.id
+                    WHERE p.name = ? AND m.type = 'user'
+                ),
+                turn_messages AS (
+                    SELECT
+                        up.message_id,
+                        up.session_id,
+                        up.prompt_text,
+                        up.git_branch,
+                        up.created_at,
+                        m.id as msg_id,
+                        m.type,
+                        m.timestamp
+                    FROM user_prompts up
+                    JOIN messages m ON m.session_id = up.session_id
+                    WHERE m.timestamp >= up.prompt_ts
+                      AND (up.next_user_ts IS NULL OR m.timestamp < up.next_user_ts)
+                ),
+                turn_stats AS (
+                    SELECT
+                        tm.message_id as message_id,
+                        tm.session_id,
+                        tm.prompt_text,
+                        tm.git_branch,
+                        tm.created_at,
+                        COUNT(DISTINCT msg_id) as message_count,
+                        COUNT(DISTINCT CASE WHEN type = 'user' THEN msg_id END) as user_prompt_count,
                         COUNT(DISTINCT cs.id) as code_count,
                         SUM(cs.line_count) as total_lines,
                         COUNT(DISTINCT cs.language) as language_diversity,
                         COUNT(DISTINCT CASE WHEN cs.has_sensitive THEN cs.id END) as sensitive_count
-                    FROM sessions s
-                    JOIN projects p ON s.project_id = p.id
-                    LEFT JOIN messages m ON s.session_id = m.session_id
-                    LEFT JOIN code_snippets cs ON m.id = cs.message_id
-                    WHERE p.name = ?
-                    GROUP BY s.session_id
-                    HAVING code_count > 0
+                    FROM turn_messages tm
+                    LEFT JOIN code_snippets cs ON cs.message_id = tm.msg_id
+                    GROUP BY tm.message_id
+                    {having_clause}
                 ),
-                session_metrics AS (
+                prompt_metrics AS (
                     SELECT
-                        session_id,
-                        prompt_text,
-                        git_branch,
-                        created_at,
+                        ts.message_id,
+                        ts.session_id,
+                        ts.prompt_text,
+                        ts.git_branch,
+                        ts.created_at,
                         message_count,
                         user_prompt_count,
                         code_count,
@@ -358,9 +375,10 @@ class PromptAnalytics:
                             WHEN lower(prompt_text) LIKE '%리팩토링%' OR lower(prompt_text) LIKE '%refactor%' THEN '리팩토링'
                             ELSE '기타'
                         END as category
-                    FROM base_metrics
+                    FROM turn_stats ts
                 )
                 SELECT
+                    message_id,
                     session_id,
                     prompt_text as first_prompt,
                     git_branch,
@@ -374,9 +392,9 @@ class PromptAnalytics:
                     sensitive_count,
                     -- Efficiency: 코드 생성량 / 사용자 프롬프트 수
                     ROUND(CAST(code_count AS FLOAT) / NULLIF(user_prompt_count, 0), 2) as efficiency_score,
-                    -- Clarity: 짧은 대화일수록 명확한 프롬프트 (정규화: 1 / log(messages))
+                    -- Clarity: 짧은 대화일수록 명확한 프롬프트
                     ROUND(100.0 / NULLIF(message_count, 0), 2) as clarity_score,
-                    -- Productivity: 총 생성 라인 수 (상위 20%면 높은 점수)
+                    -- Productivity: 총 생성 라인 수
                     total_lines as productivity_score,
                     -- Quality: 민감 정보 없고 언어 다양성 높으면 좋음
                     CASE
@@ -386,8 +404,13 @@ class PromptAnalytics:
                         WHEN language_diversity >= 3 THEN 5
                         ELSE 3
                     END as quality_score
-                FROM session_metrics
-            """, (project_name,))
+                FROM prompt_metrics
+            """
+
+            having_clause = "HAVING code_count > 0" if not include_nocode else ""
+            query = query.format(having_clause=having_clause)
+
+            cursor = conn.execute(query, (project_name,))
 
             results = [dict(row) for row in cursor.fetchall()]
 
@@ -396,7 +419,7 @@ class PromptAnalytics:
                 extracted_prompt = self._extract_command_args(r.get("first_prompt"))
                 if extracted_prompt:
                     r["first_prompt"] = extracted_prompt
-                elif self._is_command_only(r.get("first_prompt")):
+                elif not include_commands and self._is_command_only(r.get("first_prompt")):
                     continue
                 elif not r.get("first_prompt"):
                     continue
@@ -456,7 +479,13 @@ class PromptAnalytics:
         extracted = self._extract_command_args(prompt_text)
         return not extracted
 
-    def get_best_prompts(self, project_name: str = "front", limit: int = 10) -> List[Dict]:
+    def get_best_prompts(
+        self,
+        project_name: str = "front",
+        limit: int = 10,
+        include_nocode: bool = False,
+        include_commands: bool = False
+    ) -> List[Dict]:
         """Get best performing prompts.
 
         Args:
@@ -466,10 +495,20 @@ class PromptAnalytics:
         Returns:
             List of best prompts with scores
         """
-        all_prompts = self.analyze_prompt_quality(project_name)
+        all_prompts = self.analyze_prompt_quality(
+            project_name,
+            include_nocode=include_nocode,
+            include_commands=include_commands
+        )
         return all_prompts[:limit]
 
-    def get_worst_prompts(self, project_name: str = "front", limit: int = 10) -> List[Dict]:
+    def get_worst_prompts(
+        self,
+        project_name: str = "front",
+        limit: int = 10,
+        include_nocode: bool = False,
+        include_commands: bool = False
+    ) -> List[Dict]:
         """Get worst performing prompts.
 
         Args:
@@ -479,7 +518,11 @@ class PromptAnalytics:
         Returns:
             List of worst prompts with scores
         """
-        all_prompts = self.analyze_prompt_quality(project_name)
+        all_prompts = self.analyze_prompt_quality(
+            project_name,
+            include_nocode=include_nocode,
+            include_commands=include_commands
+        )
         return all_prompts[-limit:][::-1]  # Reverse to show worst first
 
     def export_prompt_library(self, project_name: str = "front", output_path: Optional[Path] = None):
