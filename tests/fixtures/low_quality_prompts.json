@@ -1,0 +1,142 @@
+[
+  {
+    "prompt": "fix it",
+    "code_count": 1,
+    "total_lines": 5,
+    "message_count": 50,
+    "language_diversity": 1
+  },
+  {
+    "prompt": "수정해줘",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 30,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "에러",
+    "code_count": 1,
+    "total_lines": 3,
+    "message_count": 40,
+    "language_diversity": 1
+  },
+  {
+    "prompt": "안됨",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 25,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "help",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 20,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "?",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 15,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "ok",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 10,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "ㅇㅇ",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 8,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "그거",
+    "code_count": 1,
+    "total_lines": 10,
+    "message_count": 35,
+    "language_diversity": 1
+  },
+  {
+    "prompt": "다시",
+    "code_count": 2,
+    "total_lines": 20,
+    "message_count": 45,
+    "language_diversity": 1
+  },
+  {
+    "prompt": "이전꺼",
+    "code_count": 1,
+    "total_lines": 8,
+    "message_count": 28,
+    "language_diversity": 1
+  },
+  {
+    "prompt": "ㄴㄴ",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 12,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "응",
+    "code_count": 1,
+    "total_lines": 15,
+    "message_count": 22,
+    "language_diversity": 1
+  },
+  {
+    "prompt": "ㄱㄱ",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 18,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "됐어",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 14,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "아니",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 16,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "다른거",
+    "code_count": 1,
+    "total_lines": 12,
+    "message_count": 32,
+    "language_diversity": 1
+  },
+  {
+    "prompt": "취소",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 9,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "됐다",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 11,
+    "language_diversity": 0
+  },
+  {
+    "prompt": "ㅋㅋ",
+    "code_count": 0,
+    "total_lines": 0,
+    "message_count": 7,
+    "language_diversity": 0
+  }
+]

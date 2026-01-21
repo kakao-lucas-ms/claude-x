@@ -8,6 +8,9 @@ from datetime import datetime, timedelta
 import sqlite3
 
 from .storage import Storage
+from .filters import filter_prompts, is_system_message, is_likely_system_message, extract_real_prompt
+from .classifier import classify_prompt, classify_prompt_with_scores, get_category_icon, PromptCategory, legacy_to_new_category
+from .scoring import calculate_composite_score_v2
 
 
 class PromptAnalytics:
@@ -292,12 +295,16 @@ class PromptAnalytics:
         self,
         project_name: str = "front",
         include_nocode: bool = False,
-        include_commands: bool = False
+        include_commands: bool = False,
+        filter_system: bool = True
     ) -> List[Dict]:
         """Analyze prompt quality with scoring.
 
         Args:
             project_name: Project name to analyze
+            include_nocode: Include prompts without code generation
+            include_commands: Include command-only prompts
+            filter_system: Filter out system/meta messages (default: True)
 
         Returns:
             List of prompts with quality scores
@@ -416,12 +423,27 @@ class PromptAnalytics:
 
             cleaned_results = []
             for r in results:
-                extracted_prompt = self._extract_command_args(r.get("first_prompt"))
+                prompt_text = r.get("first_prompt", "")
+
+                # Try to extract real prompt from command args
+                extracted_prompt = self._extract_command_args(prompt_text)
                 if extracted_prompt:
                     r["first_prompt"] = extracted_prompt
-                elif not include_commands and self._is_command_only(r.get("first_prompt")):
+                    prompt_text = extracted_prompt
+
+                # Filter system/meta messages
+                if filter_system:
+                    if is_system_message(prompt_text):
+                        continue
+                    if is_likely_system_message(prompt_text):
+                        continue
+
+                # Filter command-only messages
+                if not include_commands and self._is_command_only(r.get("first_prompt")):
                     continue
-                elif not r.get("first_prompt"):
+
+                # Skip empty prompts
+                if not r.get("first_prompt"):
                     continue
 
                 cleaned_results.append(r)
@@ -431,12 +453,33 @@ class PromptAnalytics:
 
             max_lines = max([x['total_lines'] or 0 for x in cleaned_results])
 
-            # Calculate composite score (weighted average)
+            # Calculate composite score and classification for each result
             for r in cleaned_results:
-                # Normalize productivity score (0-10 scale)
-                normalized_productivity = (r['productivity_score'] or 0) / max(max_lines, 1) * 10
+                prompt_text = r.get('first_prompt', '')
 
-                # Composite score: efficiency 40%, clarity 30%, productivity 20%, quality 10%
+                # New category classification
+                new_category = classify_prompt(prompt_text)
+                r['category'] = new_category.value
+                r['category_icon'] = get_category_icon(new_category)
+
+                # New scoring model (v2)
+                v2_scores = calculate_composite_score_v2(
+                    prompt=prompt_text,
+                    code_count=r.get('code_count', 0) or 0,
+                    total_lines=r.get('total_lines', 0) or 0,
+                    message_count=r.get('message_count', 0) or 0,
+                    language_diversity=r.get('language_diversity', 0) or 0,
+                    max_lines=max_lines,
+                )
+                r['structure_score'] = v2_scores['structure_score']
+                r['context_score'] = v2_scores['context_score']
+                r['efficiency_score_v2'] = v2_scores['efficiency_score']
+                r['diversity_score'] = v2_scores['diversity_score']
+                r['productivity_score_v2'] = v2_scores['productivity_score']
+                r['composite_score_v2'] = v2_scores['composite_score']
+
+                # Legacy scoring (for backwards compatibility)
+                normalized_productivity = (r['productivity_score'] or 0) / max(max_lines, 1) * 10
                 r['composite_score'] = round(
                     (r['efficiency_score'] or 0) * 0.4 +
                     (r['clarity_score'] or 0) * 0.3 +
@@ -445,7 +488,7 @@ class PromptAnalytics:
                     2
                 )
 
-            return sorted(cleaned_results, key=lambda x: x['composite_score'], reverse=True)
+            return sorted(cleaned_results, key=lambda x: x['composite_score_v2'], reverse=True)
 
     def _extract_command_args(self, prompt_text: Optional[str]) -> Optional[str]:
         if not prompt_text:
@@ -484,13 +527,17 @@ class PromptAnalytics:
         project_name: str = "front",
         limit: int = 10,
         include_nocode: bool = False,
-        include_commands: bool = False
+        include_commands: bool = False,
+        filter_system: bool = True
     ) -> List[Dict]:
         """Get best performing prompts.
 
         Args:
             project_name: Project name to analyze
             limit: Number of top prompts
+            include_nocode: Include prompts without code generation
+            include_commands: Include command-only prompts
+            filter_system: Filter out system/meta messages (default: True)
 
         Returns:
             List of best prompts with scores
@@ -498,7 +545,8 @@ class PromptAnalytics:
         all_prompts = self.analyze_prompt_quality(
             project_name,
             include_nocode=include_nocode,
-            include_commands=include_commands
+            include_commands=include_commands,
+            filter_system=filter_system
         )
         return all_prompts[:limit]
 
@@ -507,13 +555,17 @@ class PromptAnalytics:
         project_name: str = "front",
         limit: int = 10,
         include_nocode: bool = False,
-        include_commands: bool = False
+        include_commands: bool = False,
+        filter_system: bool = True
     ) -> List[Dict]:
         """Get worst performing prompts.
 
         Args:
             project_name: Project name to analyze
             limit: Number of bottom prompts
+            include_nocode: Include prompts without code generation
+            include_commands: Include command-only prompts
+            filter_system: Filter out system/meta messages (default: True)
 
         Returns:
             List of worst prompts with scores
@@ -521,7 +573,8 @@ class PromptAnalytics:
         all_prompts = self.analyze_prompt_quality(
             project_name,
             include_nocode=include_nocode,
-            include_commands=include_commands
+            include_commands=include_commands,
+            filter_system=filter_system
         )
         return all_prompts[-limit:][::-1]  # Reverse to show worst first
 

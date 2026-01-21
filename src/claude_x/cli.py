@@ -642,16 +642,21 @@ def prompts(
         console.print("[bold green]🏆 베스트 프롬프트 (성공 패턴)[/bold green]\n")
 
         for i, p in enumerate(best, 1):
-            console.print(f"[bold cyan]{i}. {p['category']}[/bold cyan] (종합 점수: [green]{p['composite_score']}[/green])")
+            # Use new category icon and v2 composite score
+            cat_icon = p.get('category_icon', '📝')
+            composite_v2 = p.get('composite_score_v2', p.get('composite_score', 0))
+            console.print(f"[bold cyan]{i}. {cat_icon} {p['category']}[/bold cyan] (종합 점수: [green]{composite_v2}/10[/green])")
             console.print(f"[dim]프롬프트:[/dim] {p['first_prompt'][:prompt_length]}{'...' if len(p['first_prompt']) > prompt_length else ''}")
             console.print(f"[dim]브랜치:[/dim] [yellow]{p['git_branch'] or 'N/A'}[/yellow]  "
                          f"[dim]세션:[/dim] {p['session_id'][:12]}...")
 
-            # Score breakdown
-            console.print(f"  📊 효율성: {p['efficiency_score']} | "
-                         f"명확성: {p['clarity_score']} | "
-                         f"생산성: {p['total_lines']}줄 | "
-                         f"품질: {p['quality_score']}/10")
+            # New v2 score breakdown
+            structure = p.get('structure_score', 0)
+            context = p.get('context_score', 0)
+            efficiency_v2 = p.get('efficiency_score_v2', p.get('efficiency_score', 0))
+            diversity = p.get('diversity_score', 0)
+            console.print(f"  📊 구조: {structure}/10 | 컨텍스트: {context}/10 | "
+                         f"효율: {efficiency_v2}/10 | 다양성: {diversity}/10")
 
             # Metrics
             console.print(f"  💻 코드 {p['code_count']}개 ({p['total_lines']}줄) | "
@@ -670,13 +675,19 @@ def prompts(
         console.print("[bold red]⚠️  개선이 필요한 프롬프트[/bold red]\n")
 
         for i, p in enumerate(worst, 1):
-            console.print(f"[bold yellow]{i}. {p['category']}[/bold yellow] (종합 점수: [red]{p['composite_score']}[/red])")
+            cat_icon = p.get('category_icon', '📝')
+            composite_v2 = p.get('composite_score_v2', p.get('composite_score', 0))
+            console.print(f"[bold yellow]{i}. {cat_icon} {p['category']}[/bold yellow] (종합 점수: [red]{composite_v2}/10[/red])")
             console.print(f"[dim]프롬프트:[/dim] {p['first_prompt'][:prompt_length]}{'...' if len(p['first_prompt']) > prompt_length else ''}")
 
-            # Issues
+            # Issues based on new v2 scores
             issues = []
-            if p['efficiency_score'] < 1:
-                issues.append("낮은 효율성")
+            structure = p.get('structure_score', 0)
+            context = p.get('context_score', 0)
+            if structure < 3:
+                issues.append("구조 부족")
+            if context < 3:
+                issues.append("컨텍스트 부족")
             if p['message_count'] > 100:
                 issues.append("긴 대화")
             if p['sensitive_count'] > 0:
@@ -687,8 +698,7 @@ def prompts(
             if issues:
                 console.print(f"  [red]❌ 문제점:[/red] {', '.join(issues)}")
 
-            console.print(f"  📊 효율성: {p['efficiency_score']} | "
-                         f"명확성: {p['clarity_score']} | "
+            console.print(f"  📊 구조: {structure}/10 | 컨텍스트: {context}/10 | "
                          f"메시지: {p['message_count']}개")
             console.print()
 
