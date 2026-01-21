@@ -579,6 +579,7 @@ def prompts(
     best_only: bool = typer.Option(False, "--best-only", help="Show only best prompts"),
     worst_only: bool = typer.Option(False, "--worst-only", help="Show only worst prompts"),
     limit: int = typer.Option(10, "--limit", "-l", help="Number of prompts to show"),
+    prompt_length: int = typer.Option(120, "--prompt-length", help="Max prompt preview length"),
     export: bool = typer.Option(False, "--export", "-e", help="Export to markdown file"),
     output: Optional[str] = typer.Option(None, "--output", "-o", help="Custom output path for markdown")
 ):
@@ -630,7 +631,7 @@ def prompts(
 
         for i, p in enumerate(best, 1):
             console.print(f"[bold cyan]{i}. {p['category']}[/bold cyan] (종합 점수: [green]{p['composite_score']}[/green])")
-            console.print(f"[dim]프롬프트:[/dim] {p['first_prompt'][:120]}{'...' if len(p['first_prompt']) > 120 else ''}")
+            console.print(f"[dim]프롬프트:[/dim] {p['first_prompt'][:prompt_length]}{'...' if len(p['first_prompt']) > prompt_length else ''}")
             console.print(f"[dim]브랜치:[/dim] [yellow]{p['git_branch'] or 'N/A'}[/yellow]  "
                          f"[dim]세션:[/dim] {p['session_id'][:12]}...")
 
@@ -658,7 +659,7 @@ def prompts(
 
         for i, p in enumerate(worst, 1):
             console.print(f"[bold yellow]{i}. {p['category']}[/bold yellow] (종합 점수: [red]{p['composite_score']}[/red])")
-            console.print(f"[dim]프롬프트:[/dim] {p['first_prompt'][:120]}{'...' if len(p['first_prompt']) > 120 else ''}")
+            console.print(f"[dim]프롬프트:[/dim] {p['first_prompt'][:prompt_length]}{'...' if len(p['first_prompt']) > prompt_length else ''}")
 
             # Issues
             issues = []

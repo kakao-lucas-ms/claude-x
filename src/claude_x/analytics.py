@@ -299,10 +299,29 @@ class PromptAnalytics:
         """
         with self.storage._get_connection() as conn:
             cursor = conn.execute("""
-                WITH session_metrics AS (
+                WITH base_metrics AS (
                     SELECT
                         s.session_id,
-                        s.first_prompt,
+                        COALESCE(
+                            (
+                                SELECT content
+                                FROM messages m_first
+                                WHERE m_first.session_id = s.session_id
+                                  AND m_first.type = 'user'
+                                  AND instr(m_first.content, '<command-args>') > 0
+                                ORDER BY m_first.timestamp ASC
+                                LIMIT 1
+                            ),
+                            (
+                                SELECT content
+                                FROM messages m_first
+                                WHERE m_first.session_id = s.session_id
+                                  AND m_first.type = 'user'
+                                ORDER BY m_first.timestamp ASC
+                                LIMIT 1
+                            ),
+                            s.first_prompt
+                        ) as prompt_text,
                         s.git_branch,
                         s.created_at,
                         COUNT(DISTINCT m.id) as message_count,
@@ -310,15 +329,7 @@ class PromptAnalytics:
                         COUNT(DISTINCT cs.id) as code_count,
                         SUM(cs.line_count) as total_lines,
                         COUNT(DISTINCT cs.language) as language_diversity,
-                        COUNT(DISTINCT CASE WHEN cs.has_sensitive THEN cs.id END) as sensitive_count,
-                        CASE
-                            WHEN lower(s.first_prompt) LIKE '%리뷰%' OR lower(s.first_prompt) LIKE '%review%' THEN '코드 리뷰'
-                            WHEN lower(s.first_prompt) LIKE '%테스트%' OR lower(s.first_prompt) LIKE '%test%' THEN '테스트'
-                            WHEN lower(s.first_prompt) LIKE '%버그%' OR lower(s.first_prompt) LIKE '%bug%' OR lower(s.first_prompt) LIKE '%fix%' THEN '버그 수정'
-                            WHEN lower(s.first_prompt) LIKE '%구현%' OR lower(s.first_prompt) LIKE '%implement%' OR lower(s.first_prompt) LIKE '%add%' THEN '기능 구현'
-                            WHEN lower(s.first_prompt) LIKE '%리팩토링%' OR lower(s.first_prompt) LIKE '%refactor%' THEN '리팩토링'
-                            ELSE '기타'
-                        END as category
+                        COUNT(DISTINCT CASE WHEN cs.has_sensitive THEN cs.id END) as sensitive_count
                     FROM sessions s
                     JOIN projects p ON s.project_id = p.id
                     LEFT JOIN messages m ON s.session_id = m.session_id
@@ -326,10 +337,32 @@ class PromptAnalytics:
                     WHERE p.name = ?
                     GROUP BY s.session_id
                     HAVING code_count > 0
+                ),
+                session_metrics AS (
+                    SELECT
+                        session_id,
+                        prompt_text,
+                        git_branch,
+                        created_at,
+                        message_count,
+                        user_prompt_count,
+                        code_count,
+                        total_lines,
+                        language_diversity,
+                        sensitive_count,
+                        CASE
+                            WHEN lower(prompt_text) LIKE '%리뷰%' OR lower(prompt_text) LIKE '%review%' THEN '코드 리뷰'
+                            WHEN lower(prompt_text) LIKE '%테스트%' OR lower(prompt_text) LIKE '%test%' THEN '테스트'
+                            WHEN lower(prompt_text) LIKE '%버그%' OR lower(prompt_text) LIKE '%bug%' OR lower(prompt_text) LIKE '%fix%' THEN '버그 수정'
+                            WHEN lower(prompt_text) LIKE '%구현%' OR lower(prompt_text) LIKE '%implement%' OR lower(prompt_text) LIKE '%add%' THEN '기능 구현'
+                            WHEN lower(prompt_text) LIKE '%리팩토링%' OR lower(prompt_text) LIKE '%refactor%' THEN '리팩토링'
+                            ELSE '기타'
+                        END as category
+                    FROM base_metrics
                 )
                 SELECT
                     session_id,
-                    first_prompt,
+                    prompt_text as first_prompt,
                     git_branch,
                     created_at,
                     category,
@@ -358,10 +391,26 @@ class PromptAnalytics:
 
             results = [dict(row) for row in cursor.fetchall()]
 
-            # Calculate composite score (weighted average)
+            cleaned_results = []
             for r in results:
+                extracted_prompt = self._extract_command_args(r.get("first_prompt"))
+                if extracted_prompt:
+                    r["first_prompt"] = extracted_prompt
+                elif self._is_command_only(r.get("first_prompt")):
+                    continue
+                elif not r.get("first_prompt"):
+                    continue
+
+                cleaned_results.append(r)
+
+            if not cleaned_results:
+                return []
+
+            max_lines = max([x['total_lines'] or 0 for x in cleaned_results])
+
+            # Calculate composite score (weighted average)
+            for r in cleaned_results:
                 # Normalize productivity score (0-10 scale)
-                max_lines = max([x['total_lines'] or 0 for x in results])
                 normalized_productivity = (r['productivity_score'] or 0) / max(max_lines, 1) * 10
 
                 # Composite score: efficiency 40%, clarity 30%, productivity 20%, quality 10%
@@ -373,7 +422,39 @@ class PromptAnalytics:
                     2
                 )
 
-            return sorted(results, key=lambda x: x['composite_score'], reverse=True)
+            return sorted(cleaned_results, key=lambda x: x['composite_score'], reverse=True)
+
+    def _extract_command_args(self, prompt_text: Optional[str]) -> Optional[str]:
+        if not prompt_text:
+            return None
+
+        start = prompt_text.find("<command-args>")
+        if start == -1:
+            return None
+
+        start += len("<command-args>")
+        end = prompt_text.find("</command-args>", start)
+        if end == -1:
+            return None
+
+        args = prompt_text[start:end].strip()
+        if not args:
+            return None
+
+        if args.startswith('"') and args.endswith('"') and len(args) >= 2:
+            args = args[1:-1].strip()
+
+        return args or None
+
+    def _is_command_only(self, prompt_text: Optional[str]) -> bool:
+        if not prompt_text:
+            return True
+
+        if "<command-name>" not in prompt_text and "<command-message>" not in prompt_text:
+            return False
+
+        extracted = self._extract_command_args(prompt_text)
+        return not extracted
 
     def get_best_prompts(self, project_name: str = "front", limit: int = 10) -> List[Dict]:
         """Get best performing prompts.
@@ -401,7 +482,7 @@ class PromptAnalytics:
         all_prompts = self.analyze_prompt_quality(project_name)
         return all_prompts[-limit:][::-1]  # Reverse to show worst first
 
-    def export_prompt_library(self, project_name: str = "front", output_path: Path = None):
+    def export_prompt_library(self, project_name: str = "front", output_path: Optional[Path] = None):
         """Export prompt library as markdown.
 
         Args:
