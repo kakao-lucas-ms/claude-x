@@ -1,7 +1,7 @@
 """Data models for Claude-X."""
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field
 
 
@@ -81,4 +81,4 @@ class SessionIndex(BaseModel):
     """Represents the sessions-index.json file structure."""
 
     version: int
-    entries: list[SessionIndexEntry]
+    entries: List[SessionIndexEntry]

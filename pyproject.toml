@@ -7,7 +7,7 @@ license = { text = "MIT" }
 authors = [
     { name = "lucas.ms(이문성)/kakao", email = "lucas.ms@kakaocorp.com" }
 ]
-requires-python = ">=3.13"
+requires-python = ">=3.10"
 dependencies = [
     "rich>=14.2.0",
     "typer>=0.21.1",
@@ -30,17 +30,20 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: Utilities",
 ]
 
 [project.urls]
-Homepage = "https://github.com/YOUR-USERNAME/claude-x"
-Documentation = "https://github.com/YOUR-USERNAME/claude-x#readme"
-Repository = "https://github.com/YOUR-USERNAME/claude-x"
-Issues = "https://github.com/YOUR-USERNAME/claude-x/issues"
-Changelog = "https://github.com/YOUR-USERNAME/claude-x/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/kakao/claude-x"
+Documentation = "https://github.com/kakao/claude-x#readme"
+Repository = "https://github.com/kakao/claude-x"
+Issues = "https://github.com/kakao/claude-x/issues"
+Changelog = "https://github.com/kakao/claude-x/blob/main/CHANGELOG.md"
 
 [project.scripts]
 cx = "claude_x.cli:main"

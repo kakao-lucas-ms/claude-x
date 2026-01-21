@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import Iterator
+from typing import Iterator, List, Tuple
 from .models import SessionIndex, SessionIndexEntry
 
 
@@ -18,7 +18,7 @@ class SessionIndexer:
         self.claude_dir = claude_dir
         self.projects_dir = claude_dir / "projects"
 
-    def find_all_project_dirs(self) -> list[Path]:
+    def find_all_project_dirs(self) -> List[Path]:
         """Find all project directories containing sessions-index.json.
 
         Returns:
@@ -50,7 +50,7 @@ class SessionIndexer:
 
         return SessionIndex(**data)
 
-    def iter_all_sessions(self) -> Iterator[tuple[Path, SessionIndexEntry]]:
+    def iter_all_sessions(self) -> Iterator[Tuple[Path, SessionIndexEntry]]:
         """Iterate over all sessions across all projects.
 
         Yields:
@@ -66,7 +66,7 @@ class SessionIndexer:
                 print(f"Warning: Failed to parse {index_file}: {e}")
                 continue
 
-    def get_project_sessions(self, project_dir: Path) -> list[SessionIndexEntry]:
+    def get_project_sessions(self, project_dir: Path) -> List[SessionIndexEntry]:
         """Get all sessions for a specific project.
 
         Args:
