@@ -583,7 +583,9 @@ def prompts(
     include_nocode: bool = typer.Option(False, "--include-nocode", help="Include sessions without code"),
     include_commands: bool = typer.Option(False, "--include-commands", help="Include command-only prompts"),
     export: bool = typer.Option(False, "--export", "-e", help="Export to markdown file"),
-    output: Optional[str] = typer.Option(None, "--output", "-o", help="Custom output path for markdown")
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Custom output path for markdown"),
+    min_quality: Optional[float] = typer.Option(None, "--min-quality", help="Minimum combined structure+context score"),
+    strict: bool = typer.Option(False, "--strict", help="Strict mode: require structure>=3.0, context>=2.0")
 ):
     """Analyze prompt quality and generate prompt library."""
     storage = get_storage()
@@ -623,7 +625,9 @@ def prompts(
                 project,
                 limit,
                 include_nocode=include_nocode,
-                include_commands=include_commands
+                include_commands=include_commands,
+                min_quality=min_quality,
+                strict_mode=strict
             )
         if not best_only:
             worst = analytics.get_worst_prompts(

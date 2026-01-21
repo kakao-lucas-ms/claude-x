@@ -528,7 +528,11 @@ class PromptAnalytics:
         limit: int = 10,
         include_nocode: bool = False,
         include_commands: bool = False,
-        filter_system: bool = True
+        filter_system: bool = True,
+        min_structure: float = 2.0,
+        min_context: float = 0.0,
+        min_quality: Optional[float] = None,
+        strict_mode: bool = False
     ) -> List[Dict]:
         """Get best performing prompts.
 
@@ -538,6 +542,10 @@ class PromptAnalytics:
             include_nocode: Include prompts without code generation
             include_commands: Include command-only prompts
             filter_system: Filter out system/meta messages (default: True)
+            min_structure: Minimum structure score (default: 2.0)
+            min_context: Minimum context score (default: 0.0)
+            min_quality: Minimum combined structure+context score (overrides individual mins)
+            strict_mode: If True, use stricter thresholds (structure>=3.0, context>=2.0)
 
         Returns:
             List of best prompts with scores
@@ -548,7 +556,32 @@ class PromptAnalytics:
             include_commands=include_commands,
             filter_system=filter_system
         )
-        return all_prompts[:limit]
+
+        # Apply strict mode thresholds
+        if strict_mode:
+            min_structure = 3.0
+            min_context = 2.0
+
+        # Filter by quality thresholds
+        filtered_prompts = []
+        for p in all_prompts:
+            structure = p.get('structure_score', 0)
+            context = p.get('context_score', 0)
+
+            # Check min_quality (combined threshold)
+            if min_quality is not None:
+                if structure + context < min_quality:
+                    continue
+            else:
+                # Check individual thresholds
+                if structure < min_structure:
+                    continue
+                if context < min_context:
+                    continue
+
+            filtered_prompts.append(p)
+
+        return filtered_prompts[:limit]
 
     def get_worst_prompts(
         self,

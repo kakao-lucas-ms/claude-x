@@ -361,3 +361,70 @@ class TestScoringAccuracy:
         low_avg = sum(low_structure_scores) / len(low_structure_scores)
 
         assert high_avg > low_avg, f"High quality structure avg ({high_avg:.2f}) should be > low quality ({low_avg:.2f})"
+
+
+class TestQualityPenalty:
+    """Tests for quality penalty in composite score."""
+
+    def test_penalty_applied_for_low_structure(self):
+        """Should apply penalty when structure < 2.0."""
+        result = calculate_composite_score_v2(
+            prompt="fix it",  # Very short, low structure
+            code_count=5,
+            total_lines=100,
+            message_count=3,
+            language_diversity=2,
+        )
+        assert result.get('quality_penalty', 1.0) < 1.0
+
+    def test_penalty_applied_for_low_context(self):
+        """Should apply penalty when context < 1.0."""
+        result = calculate_composite_score_v2(
+            prompt="그거 해줘",  # Context dependent, low context
+            code_count=5,
+            total_lines=100,
+            message_count=3,
+            language_diversity=2,
+        )
+        assert result.get('quality_penalty', 1.0) < 1.0
+
+    def test_no_penalty_for_high_quality(self):
+        """Should not apply penalty for high quality prompts."""
+        result = calculate_composite_score_v2(
+            prompt="LoginForm.tsx 컴포넌트에 비밀번호 유효성 검사를 추가해줘. React를 사용하고 있어.",
+            code_count=5,
+            total_lines=100,
+            message_count=3,
+            language_diversity=2,
+        )
+        assert result.get('quality_penalty', 1.0) == 1.0
+
+    def test_heavy_penalty_for_very_low_quality(self):
+        """Should apply heavy penalty when both structure and context < 1.0."""
+        result = calculate_composite_score_v2(
+            prompt="ok",  # Very short, both scores very low
+            code_count=5,
+            total_lines=100,
+            message_count=3,
+            language_diversity=2,
+        )
+        assert result.get('quality_penalty', 1.0) == 0.6
+
+    def test_penalty_reduces_composite_score(self):
+        """Penalty should reduce composite score."""
+        low_quality = calculate_composite_score_v2(
+            prompt="fix",
+            code_count=10,
+            total_lines=200,
+            message_count=2,
+            language_diversity=3,
+        )
+        high_quality = calculate_composite_score_v2(
+            prompt="LoginForm.tsx에 validation을 추가해줘. React 프로젝트야.",
+            code_count=10,
+            total_lines=200,
+            message_count=2,
+            language_diversity=3,
+        )
+        # Even with same productivity/efficiency/diversity, high quality should score higher
+        assert high_quality['composite_score'] > low_quality['composite_score']

@@ -423,6 +423,16 @@ def calculate_composite_score_v2(
         diversity * 0.15
     )
 
+    # Apply penalty for low quality prompts (Option B from plan)
+    # If structure or context is too low, the prompt is not a good template
+    quality_penalty = 1.0
+    if structure < 2.0 or context < 1.0:
+        quality_penalty = 0.8
+    if structure < 1.0 and context < 1.0:
+        quality_penalty = 0.6
+
+    composite = composite * quality_penalty
+
     return {
         'structure_score': round(structure, 2),
         'context_score': round(context, 2),
@@ -430,6 +440,7 @@ def calculate_composite_score_v2(
         'efficiency_score': round(efficiency, 2),
         'diversity_score': round(diversity, 2),
         'composite_score': round(composite, 2),
+        'quality_penalty': quality_penalty,
     }
 
 
