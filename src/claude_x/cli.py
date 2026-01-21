@@ -32,11 +32,162 @@ def get_storage() -> Storage:
     return Storage(db_path)
 
 
+def db_exists() -> bool:
+    """Check if database exists."""
+    data_dir = Path.home() / ".claude-x" / "data"
+    db_path = data_dir / "claude_x.db"
+    return db_path.exists()
+
+
+def claude_code_exists() -> bool:
+    """Check if Claude Code is installed."""
+    claude_dir = Path.home() / ".claude"
+    projects_dir = claude_dir / "projects"
+    return projects_dir.exists()
+
+
+def version_callback(value: bool):
+    """Print version and exit."""
+    if value:
+        try:
+            from importlib.metadata import version
+            __version__ = version("claude-x")
+        except Exception:
+            __version__ = "0.1.0"
+        console.print(f"Claude-X version {__version__}")
+        raise typer.Exit()
+
+
+@app.callback(invoke_without_command=True)
+def main_callback(
+    ctx: typer.Context,
+    version: Optional[bool] = typer.Option(
+        None,
+        "--version",
+        "-v",
+        callback=version_callback,
+        is_eager=True,
+        help="Show version and exit"
+    )
+):
+    """Auto-initialize on first run."""
+    # Skip auto-init for init command itself or when no command
+    if ctx.invoked_subcommand in ["init", None]:
+        return
+
+    # Check if DB exists
+    if not db_exists():
+        console.print("[yellow]First run detected. Initializing database...[/yellow]")
+        storage = get_storage()
+        console.print(f"✅ Database created at: {storage.db_path}")
+
+        # Check if Claude Code exists
+        if not claude_code_exists():
+            console.print("\n[yellow]⚠️  Claude Code directory not found at ~/.claude/projects/[/yellow]")
+            console.print("[dim]Make sure Claude Code is installed and you've run at least one session.[/dim]")
+            console.print("[dim]Visit: https://claude.ai/code[/dim]\n")
+
+
 @app.command()
 def init():
     """Initialize Claude-X database."""
     storage = get_storage()
     console.print("✅ Database initialized at:", storage.db_path)
+
+
+@app.command()
+def doctor():
+    """Diagnose installation and configuration issues."""
+    import sys
+    import shutil
+
+    console.print("\n[bold]Claude-X System Diagnostics[/bold]")
+    console.print("─" * 60)
+
+    issues = []
+    recommendations = []
+
+    # 1. Python version check
+    py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    if sys.version_info >= (3, 10):
+        console.print(f"✅ Python Version: {py_version} (compatible)")
+    else:
+        console.print(f"❌ Python Version: {py_version} (requires 3.10+)")
+        issues.append("Python version too old")
+        recommendations.append("Upgrade to Python 3.10 or later")
+
+    # 2. Dependencies check
+    try:
+        import rich
+        import typer
+        import pydantic
+        console.print("✅ Dependencies: All installed")
+    except ImportError as e:
+        console.print(f"❌ Dependencies: Missing {e.name}")
+        issues.append(f"Missing dependency: {e.name}")
+        recommendations.append("Run: pip install claude-x")
+
+    # 3. Claude Code check
+    claude_dir = Path.home() / ".claude"
+    projects_dir = claude_dir / "projects"
+    if projects_dir.exists():
+        console.print(f"✅ Claude Code: Found at {claude_dir}")
+
+        # Count sessions
+        indexer = SessionIndexer()
+        project_dirs = indexer.find_all_project_dirs()
+        session_count = sum(1 for _ in indexer.iter_all_sessions())
+        console.print(f"   {len(project_dirs)} projects, {session_count} sessions")
+    else:
+        console.print(f"❌ Claude Code: Not found at {claude_dir}")
+        issues.append("Claude Code not installed or never used")
+        recommendations.append("Install Claude Code from https://claude.ai/code")
+        recommendations.append("Run at least one Claude Code session")
+
+    # 4. Database check
+    data_dir = Path.home() / ".claude-x" / "data"
+    db_path = data_dir / "claude_x.db"
+    if db_path.exists():
+        size_mb = db_path.stat().st_size / (1024 * 1024)
+        console.print(f"✅ Database: Healthy ({size_mb:.1f} MB)")
+
+        # Get stats
+        try:
+            storage = get_storage()
+            stats = storage.get_stats()
+            console.print(f"   {stats.get('sessions', 0)} sessions indexed")
+        except Exception as e:
+            console.print(f"[yellow]   Warning: Could not read stats: {e}[/yellow]")
+    else:
+        console.print(f"❌ Database: Not initialized")
+        recommendations.append("Run: cx init")
+
+    # 5. Disk space check
+    if data_dir.exists():
+        stat = shutil.disk_usage(data_dir)
+        free_gb = stat.free / (1024 ** 3)
+        if free_gb < 1:
+            console.print(f"⚠️  Disk Space: Low ({free_gb:.1f} GB free)")
+            recommendations.append("Free up disk space")
+        else:
+            console.print(f"✅ Disk Space: {free_gb:.1f} GB free")
+
+    # Summary
+    console.print("\n" + "─" * 60)
+    if issues:
+        console.print(f"\n[bold red]Issues Found: {len(issues)}[/bold red]")
+        for issue in issues:
+            console.print(f"  • {issue}")
+
+        console.print(f"\n[bold yellow]Recommendations:[/bold yellow]")
+        for rec in recommendations:
+            console.print(f"  → {rec}")
+
+        console.print("\n[bold]Overall Status: Needs Attention ⚠️[/bold]")
+    else:
+        console.print("\n[bold green]Overall Status: Healthy ✓[/bold green]")
+
+    console.print()
 
 
 @app.command("import")
@@ -165,7 +316,8 @@ def search(
     query: str,
     lang: Optional[str] = typer.Option(None, "--lang", "-l", help="Filter by language"),
     project: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project"),
-    limit: int = typer.Option(10, "--limit", help="Max results")
+    limit: int = typer.Option(10, "--limit", help="Max results"),
+    full: bool = typer.Option(False, "--full", "-f", help="Show full text without truncation")
 ):
     """Search code snippets using full-text search."""
     storage = get_storage()
@@ -187,8 +339,18 @@ def search(
         console.print(f"  Branch: [yellow]{result['git_branch'] or 'N/A'}[/yellow]")
         console.print(f"  Language: [blue]{result['language']}[/blue]")
         console.print(f"  Lines: {result['line_count']}")
-        console.print(f"  Prompt: [dim]{result['first_prompt'][:60]}...[/dim]")
-        console.print(f"\n[dim]{result['code'][:200]}...[/dim]\n")
+
+        # Show prompt (always show full text - it's important context)
+        prompt_text = result['first_prompt']
+        console.print(f"  Prompt: [dim]{prompt_text}[/dim]")
+
+        # Show code (truncate unless --full flag)
+        code_text = result['code']
+        if full or len(code_text) <= 500:
+            console.print(f"\n[dim]{code_text}[/dim]\n")
+        else:
+            console.print(f"\n[dim]{code_text[:500]}...[/dim]\n")
+            console.print(f"[dim]💡 Use --full to see complete code[/dim]\n")
 
 
 @app.command()

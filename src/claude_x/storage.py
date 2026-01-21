@@ -249,7 +249,15 @@ class Storage:
                     cs.code,
                     cs.line_count,
                     cs.session_id,
-                    s.first_prompt,
+                    COALESCE(
+                        (SELECT content
+                         FROM messages
+                         WHERE session_id = s.session_id
+                           AND type = 'user'
+                         ORDER BY timestamp ASC
+                         LIMIT 1),
+                        s.first_prompt
+                    ) as first_prompt,
                     s.git_branch,
                     p.name as project_name,
                     rank
