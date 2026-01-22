@@ -1,0 +1,7 @@
+{
+  "claude-x": {
+    "command": "cx-mcp",
+    "args": [],
+    "env": {}
+  }
+}

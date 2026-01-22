@@ -1,0 +1,22 @@
+{
+  "name": "claude-x",
+  "version": "0.3.0",
+  "description": "Second Brain for Claude Code - Prompt analytics, session insights, and productivity tools",
+  "author": {
+    "name": "lucas.ms",
+    "email": "karismalms@naver.com"
+  },
+  "homepage": "https://github.com/kakao-lucas-ms/claude-x",
+  "repository": "https://github.com/kakao-lucas-ms/claude-x",
+  "license": "MIT",
+  "keywords": [
+    "analytics",
+    "prompts",
+    "sessions",
+    "productivity",
+    "mcp",
+    "prompt-engineering"
+  ],
+  "commands": "./commands",
+  "mcpServers": "./.mcp.json"
+}
