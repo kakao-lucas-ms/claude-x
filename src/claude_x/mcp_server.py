@@ -53,10 +53,22 @@ def get_best_prompts(
         strict_mode=strict,
         min_quality=min_quality,
     )
-    return {
+
+    result = {
         "count": len(prompts),
         "prompts": prompts,
     }
+
+    # Add helpful message if no data
+    if len(prompts) == 0:
+        result["message"] = (
+            "No session data found. To collect data:\n"
+            "1. Run 'cx watch' in background, or\n"
+            "2. Just use Claude Code normally - sessions are auto-saved to ~/.claude/projects/\n"
+            "3. Make sure you've used Claude Code at least once since installing claude-x"
+        )
+
+    return result
 
 
 @mcp.tool()
@@ -78,10 +90,22 @@ def get_worst_prompts(
         project_name=project,
         limit=limit,
     )
-    return {
+
+    result = {
         "count": len(prompts),
         "prompts": prompts,
     }
+
+    # Add helpful message if no data
+    if len(prompts) == 0:
+        result["message"] = (
+            "No session data found. To collect data:\n"
+            "1. Run 'cx watch' in background, or\n"
+            "2. Just use Claude Code normally - sessions are auto-saved to ~/.claude/projects/\n"
+            "3. Make sure you've used Claude Code at least once since installing claude-x"
+        )
+
+    return result
 
 
 @mcp.tool()
@@ -101,12 +125,28 @@ def analyze_sessions(
         - Branch productivity
     """
     analytics = get_analytics()
-    return {
+    storage = get_storage()
+
+    # Check if we have any sessions
+    sessions = list(storage.list_sessions(project_name=project))
+
+    result = {
         "time_analysis": analytics.get_time_based_analysis(project_name=project),
         "language_distribution": analytics.get_language_distribution(project_name=project),
         "category_stats": analytics.get_category_stats(project_name=project),
         "branch_productivity": analytics.get_branch_productivity(project_name=project),
     }
+
+    # Add helpful message if no data
+    if len(sessions) == 0:
+        result["message"] = (
+            f"No session data found for project '{project}'. To collect data:\n"
+            "1. Run 'cx watch' in background, or\n"
+            "2. Just use Claude Code normally - sessions are auto-saved to ~/.claude/projects/\n"
+            "3. Make sure you've used Claude Code at least once since installing claude-x"
+        )
+
+    return result
 
 
 @mcp.tool()
@@ -197,11 +237,22 @@ def get_prompt_patterns(
             "category": p.get("category", "unknown"),
         })
 
-    return {
+    result = {
         "patterns": patterns,
         "top_examples": examples,
         "recommendation": "Include file paths, technology names, and clear action verbs for best results.",
     }
+
+    # Add helpful message if no data
+    if len(best_prompts) == 0:
+        result["message"] = (
+            "No session data found to analyze patterns. To collect data:\n"
+            "1. Run 'cx watch' in background, or\n"
+            "2. Just use Claude Code normally - sessions are auto-saved to ~/.claude/projects/\n"
+            "3. Make sure you've used Claude Code at least once since installing claude-x"
+        )
+
+    return result
 
 
 def main():

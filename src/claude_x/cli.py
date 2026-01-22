@@ -141,11 +141,29 @@ def init():
         console.print("✅ MCP server configured in Claude Code")
         console.print(f"   Location: {claude_settings}")
 
+    # Check if database has any data
+    session_count = len(list(storage.list_sessions()))
+
     console.print("\n[bold green]Setup Complete![/bold green]")
+
+    if session_count == 0:
+        console.print("\n[yellow]📊 Database Status: Empty[/yellow]")
+        console.print("[dim]Your database is initialized but has no data yet.[/dim]\n")
+        console.print("[bold]To collect data, choose one:[/bold]")
+        console.print("  Option 1: Run 'cx watch' in background to auto-collect sessions")
+        console.print("  Option 2: Just use Claude Code normally - sessions are saved automatically")
+        console.print("\n[dim]Note: MCP tools will return empty results until you have session data.[/dim]")
+    else:
+        console.print(f"\n[green]📊 Database Status: {session_count} sessions found[/green]")
+
     console.print("\n[bold]Next steps:[/bold]")
     console.print("1. Restart Claude Code (Cmd+Q, then reopen)")
     console.print("2. Run '/mcp' to verify claude-x is listed")
-    console.print("3. Try: '내 베스트 프롬프트 보여줘'")
+    if session_count == 0:
+        console.print("3. Use Claude Code to create some sessions")
+        console.print("4. Then try: '내 베스트 프롬프트 보여줘'")
+    else:
+        console.print("3. Try: '내 베스트 프롬프트 보여줘'")
 
 
 @app.command()
