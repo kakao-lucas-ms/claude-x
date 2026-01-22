@@ -338,6 +338,70 @@ def doctor():
         else:
             console.print(f"✅ Disk Space: {free_gb:.1f} GB free")
 
+    # 6. MCP Server Configuration Check
+    claude_settings = Path.home() / ".claude" / "settings.json"
+    if claude_settings.exists():
+        try:
+            with open(claude_settings, 'r') as f:
+                settings = json.load(f)
+
+            if 'mcpServers' in settings and 'claude-x' in settings['mcpServers']:
+                console.print("✅ MCP Server: Configured in settings.json")
+                mcp_config = settings['mcpServers']['claude-x']
+                console.print(f"   Command: {mcp_config.get('command', 'N/A')}")
+            else:
+                console.print("❌ MCP Server: Not configured")
+                issues.append("MCP server not in settings.json")
+                recommendations.append("Run: cx init")
+        except Exception as e:
+            console.print(f"❌ MCP Server: Error reading settings.json - {e}")
+            issues.append("Invalid settings.json")
+            recommendations.append("Delete ~/.claude/settings.json and run: cx init")
+    else:
+        console.print("❌ MCP Server: settings.json not found")
+        issues.append("No Claude Code settings file")
+        recommendations.append("Run: cx init")
+
+    # 7. MCP Command Check
+    import subprocess
+    cx_mcp_path = shutil.which("cx-mcp")
+    if cx_mcp_path:
+        console.print(f"✅ cx-mcp: Found at {cx_mcp_path}")
+
+        # Test MCP server
+        try:
+            result = subprocess.run(
+                [sys.executable, "-m", "claude_x.mcp_server"],
+                input='{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test","version":"1.0"}}}\n',
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and "result" in result.stdout:
+                console.print("✅ MCP Server: Test successful")
+            else:
+                console.print("⚠️  MCP Server: Test failed")
+                console.print(f"   Error: {result.stderr[:100]}")
+                issues.append("MCP server not responding correctly")
+                recommendations.append("Reinstall: pip install --force-reinstall claude-x")
+        except subprocess.TimeoutExpired:
+            console.print("✅ MCP Server: Running (timeout expected)")
+        except Exception as e:
+            console.print(f"❌ MCP Server: Test error - {e}")
+            issues.append("MCP server test failed")
+    else:
+        console.print("❌ cx-mcp: Command not found")
+        issues.append("cx-mcp not in PATH")
+        recommendations.append("Reinstall: pip install --force-reinstall claude-x")
+
+    # 8. Claude Code Restart Reminder
+    console.print("\n[bold cyan]MCP Troubleshooting:[/bold cyan]")
+    console.print("If /mcp doesn't show claude-x after cx init:")
+    console.print("1. [bold]Completely quit Claude Code (Cmd+Q)[/bold]")
+    console.print("2. [bold]Reopen Claude Code[/bold]")
+    console.print("3. Run '/mcp' command")
+    console.print("4. Look for 'claude-x' in the list")
+
     # Summary
     console.print("\n" + "─" * 60)
     if issues:
