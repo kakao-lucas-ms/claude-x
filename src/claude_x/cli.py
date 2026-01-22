@@ -91,7 +91,9 @@ def main_callback(
 
 
 @app.command()
-def init():
+def init(
+    skip_import: bool = typer.Option(False, "--skip-import", help="Skip automatic session import")
+):
     """Initialize Claude-X database and MCP server configuration."""
     # 1. Initialize database
     storage = get_storage()
@@ -149,6 +151,83 @@ def init():
 
     # Check if database has any data
     session_count = len(list(storage.list_sessions()))
+
+    # Auto-import existing sessions if database is empty
+    if session_count == 0 and not skip_import:
+        claude_projects = Path.home() / ".claude" / "projects"
+        if claude_projects.exists():
+            console.print("\n[bold cyan]📥 Importing existing Claude Code sessions...[/bold cyan]")
+
+            # Import sessions using the same logic as cx import
+            from .indexer import SessionIndexer
+            from .extractor import CodeExtractor
+            from .security import SecurityScanner
+            from .parser import SessionParser
+            from .models import Project, Session
+
+            indexer = SessionIndexer()
+            extractor = CodeExtractor()
+            scanner = SecurityScanner()
+
+            import_count = 0
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                task = progress.add_task("Importing...", total=None)
+
+                for project_dir, session_entry in indexer.iter_all_sessions():
+                    try:
+                        # Insert project
+                        project_path = indexer.decode_project_path(project_dir.name)
+                        project_model = Project(
+                            path=project_path,
+                            encoded_path=project_dir.name,
+                            name=indexer.extract_project_name(project_path)
+                        )
+                        project_id = storage.insert_project(project_model)
+
+                        # Insert session
+                        session_model = Session(
+                            session_id=session_entry.session_id,
+                            project_id=project_id,
+                            full_path=session_entry.full_path,
+                            first_prompt=session_entry.first_prompt,
+                            message_count=session_entry.message_count,
+                            git_branch=session_entry.git_branch,
+                            is_sidechain=session_entry.is_sidechain,
+                            file_mtime=session_entry.file_mtime,
+                            created_at=datetime.fromisoformat(session_entry.created.replace("Z", "+00:00")),
+                            modified_at=datetime.fromisoformat(session_entry.modified.replace("Z", "+00:00"))
+                        )
+                        storage.insert_session(session_model)
+                        import_count += 1
+
+                        # Parse messages and code (simplified for init)
+                        session_path = Path(session_entry.full_path)
+                        if session_path.exists():
+                            parser = SessionParser(session_path)
+                            for message in parser.parse_messages(session_entry.session_id):
+                                message_id = storage.insert_message(message)
+                                if message.has_code:
+                                    for snippet in extractor.extract_code_blocks(
+                                        message_id, session_entry.session_id, message.content
+                                    ):
+                                        snippet.has_sensitive = scanner.has_sensitive_data(snippet.code)
+                                        storage.insert_code_snippet(snippet)
+
+                        progress.update(task, description=f"Imported {import_count} sessions...")
+                    except Exception:
+                        # Skip problematic sessions silently
+                        continue
+
+            session_count = import_count
+            if import_count > 0:
+                console.print(f"[green]✅ Imported {import_count} sessions from Claude Code history[/green]")
+        else:
+            console.print("\n[yellow]📊 Database Status: Empty[/yellow]")
+            console.print("[dim]No existing Claude Code sessions found to import.[/dim]")
 
     console.print("\n[bold green]Setup Complete![/bold green]")
 
