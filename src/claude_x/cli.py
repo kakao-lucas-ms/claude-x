@@ -1,5 +1,7 @@
 """Command-line interface for Claude-X."""
 
+import json
+import sys
 from pathlib import Path
 from typing import Optional
 import typer
@@ -90,9 +92,60 @@ def main_callback(
 
 @app.command()
 def init():
-    """Initialize Claude-X database."""
+    """Initialize Claude-X database and MCP server configuration."""
+    # 1. Initialize database
     storage = get_storage()
     console.print("✅ Database initialized at:", storage.db_path)
+
+    # 2. Setup MCP server configuration
+    claude_settings = Path.home() / ".claude" / "settings.json"
+
+    if not claude_settings.exists():
+        console.print("⚠️  Claude Code settings not found")
+        console.print(f"   Expected at: {claude_settings}")
+        console.print("   Please make sure Claude Code is installed")
+        return
+
+    # Read existing settings
+    try:
+        with open(claude_settings, 'r') as f:
+            settings = json.load(f)
+    except json.JSONDecodeError:
+        console.print("❌ Failed to parse Claude Code settings.json")
+        return
+
+    # Check if MCP server already configured
+    if 'mcpServers' not in settings:
+        settings['mcpServers'] = {}
+
+    if 'claude-x' in settings['mcpServers']:
+        console.print("ℹ️  MCP server already configured")
+        console.print(f"   Command: {settings['mcpServers']['claude-x'].get('command', 'N/A')}")
+    else:
+        # Add MCP server configuration
+        python_path = sys.executable
+        settings['mcpServers']['claude-x'] = {
+            "command": "/usr/bin/arch",
+            "args": [
+                "-arm64",
+                python_path,
+                "-m",
+                "claude_x.mcp_server"
+            ]
+        }
+
+        # Write back to settings
+        with open(claude_settings, 'w') as f:
+            json.dump(settings, f, indent=2)
+
+        console.print("✅ MCP server configured in Claude Code")
+        console.print(f"   Location: {claude_settings}")
+
+    console.print("\n[bold green]Setup Complete![/bold green]")
+    console.print("\n[bold]Next steps:[/bold]")
+    console.print("1. Restart Claude Code (Cmd+Q, then reopen)")
+    console.print("2. Run '/mcp' to verify claude-x is listed")
+    console.print("3. Try: '내 베스트 프롬프트 보여줘'")
 
 
 @app.command()

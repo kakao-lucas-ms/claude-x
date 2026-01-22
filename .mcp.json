@@ -1,7 +1,7 @@
 {
-  "claude-x": {
-    "command": "cx-mcp",
-    "args": [],
-    "env": {}
+  "mcpServers": {
+    "claude-x": {
+      "command": "cx-mcp"
+    }
   }
 }

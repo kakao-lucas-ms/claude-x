@@ -1,6 +1,6 @@
 [project]
 name = "claude-x"
-version = "0.3.0"
+version = "0.3.1"
 description = "Second Brain and Command Center for Claude Code"
 readme = "README.md"
 license = { text = "MIT" }
