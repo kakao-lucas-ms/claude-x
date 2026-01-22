@@ -99,25 +99,30 @@ def init():
 
     # 2. Setup MCP server configuration
     claude_settings = Path.home() / ".claude" / "settings.json"
+    claude_dir = claude_settings.parent
 
+    # Create .claude directory if it doesn't exist
+    if not claude_dir.exists():
+        console.print(f"📁 Creating Claude Code directory: {claude_dir}")
+        claude_dir.mkdir(parents=True, exist_ok=True)
+
+    # Read or create settings
     if not claude_settings.exists():
-        console.print("⚠️  Claude Code settings not found")
-        console.print(f"   Expected at: {claude_settings}")
-        console.print("   Please make sure Claude Code is installed")
-        return
-
-    # Read existing settings
-    try:
-        with open(claude_settings, 'r') as f:
-            settings = json.load(f)
-    except json.JSONDecodeError:
-        console.print("❌ Failed to parse Claude Code settings.json")
-        return
+        console.print("📝 Creating new settings.json")
+        settings = {}
+    else:
+        try:
+            with open(claude_settings, 'r') as f:
+                settings = json.load(f)
+        except json.JSONDecodeError:
+            console.print("⚠️  Invalid settings.json, creating new one")
+            settings = {}
 
     # Check if MCP server already configured
     if 'mcpServers' not in settings:
         settings['mcpServers'] = {}
 
+    mcp_was_added = False
     if 'claude-x' in settings['mcpServers']:
         console.print("ℹ️  MCP server already configured")
         console.print(f"   Command: {settings['mcpServers']['claude-x'].get('command', 'N/A')}")
@@ -140,6 +145,7 @@ def init():
 
         console.print("✅ MCP server configured in Claude Code")
         console.print(f"   Location: {claude_settings}")
+        mcp_was_added = True
 
     # Check if database has any data
     session_count = len(list(storage.list_sessions()))
@@ -157,13 +163,23 @@ def init():
         console.print(f"\n[green]📊 Database Status: {session_count} sessions found[/green]")
 
     console.print("\n[bold]Next steps:[/bold]")
-    console.print("1. Restart Claude Code (Cmd+Q, then reopen)")
-    console.print("2. Run '/mcp' to verify claude-x is listed")
-    if session_count == 0:
-        console.print("3. Use Claude Code to create some sessions")
-        console.print("4. Then try: '내 베스트 프롬프트 보여줘'")
+    if mcp_was_added:
+        console.print("[red bold]⚠️  IMPORTANT: You MUST restart Claude Code for MCP server to work![/bold red]")
+        console.print("1. [bold]Quit Claude Code completely (Cmd+Q)[/bold]")
+        console.print("2. [bold]Reopen Claude Code[/bold]")
+        console.print("3. Run '/mcp' to verify claude-x is listed")
+        if session_count == 0:
+            console.print("4. Use Claude Code to create some sessions")
+            console.print("5. Then try: '내 베스트 프롬프트 보여줘'")
+        else:
+            console.print("4. Try: '내 베스트 프롬프트 보여줘'")
     else:
-        console.print("3. Try: '내 베스트 프롬프트 보여줘'")
+        console.print("1. Run '/mcp' in Claude Code to verify claude-x is listed")
+        if session_count == 0:
+            console.print("2. Use Claude Code to create some sessions")
+            console.print("3. Then try: '내 베스트 프롬프트 보여줘'")
+        else:
+            console.print("2. Try: '내 베스트 프롬프트 보여줘'")
 
 
 @app.command()
