@@ -18,21 +18,50 @@ class PromptAnalytics:
 
     def __init__(self, storage: Storage):
         """Initialize analytics.
-        
+
         Args:
             storage: Storage instance
         """
         self.storage = storage
 
-    def get_category_stats(self, project_name: str = "front") -> List[Dict]:
+    def _resolve_project_name(self, project_name: Optional[str]) -> Optional[str]:
+        """Resolve project name if None by selecting most recent project.
+
+        Args:
+            project_name: Project name or None
+
+        Returns:
+            Resolved project name or None if no projects exist
+        """
+        if project_name is not None:
+            return project_name
+
+        # Get most recent project
+        with self.storage._get_connection() as conn:
+            cursor = conn.execute("""
+                SELECT p.name
+                FROM projects p
+                JOIN sessions s ON p.id = s.project_id
+                ORDER BY s.modified_at DESC
+                LIMIT 1
+            """)
+            row = cursor.fetchone()
+            return row[0] if row else None
+
+    def get_category_stats(self, project_name: Optional[str] = None) -> List[Dict]:
         """Get statistics by prompt category.
-        
+
         Args:
             project_name: Project name to analyze
-            
+
         Returns:
             List of category statistics
         """
+        # Resolve project name if None
+        project_name = self._resolve_project_name(project_name)
+        if not project_name:
+            return []  # No projects exist
+
         with self.storage._get_connection() as conn:
             cursor = conn.execute("""
                 SELECT 
@@ -61,15 +90,20 @@ class PromptAnalytics:
             """, (project_name,))
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_branch_productivity(self, project_name: str = "front") -> List[Dict]:
+    def get_branch_productivity(self, project_name: Optional[str] = None) -> List[Dict]:
         """Get productivity metrics by branch type.
-        
+
         Args:
             project_name: Project name to analyze
-            
+
         Returns:
             List of branch productivity metrics
         """
+        # Resolve project name if None
+        project_name = self._resolve_project_name(project_name)
+        if not project_name:
+            return []  # No projects exist
+
         with self.storage._get_connection() as conn:
             cursor = conn.execute("""
                 SELECT 
@@ -95,15 +129,20 @@ class PromptAnalytics:
             """, (project_name,))
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_language_distribution(self, project_name: str = "front") -> List[Dict]:
+    def get_language_distribution(self, project_name: Optional[str] = None) -> List[Dict]:
         """Get code language distribution.
-        
+
         Args:
             project_name: Project name to analyze
-            
+
         Returns:
             List of language statistics
         """
+        # Resolve project name if None
+        project_name = self._resolve_project_name(project_name)
+        if not project_name:
+            return []  # No projects exist
+
         with self.storage._get_connection() as conn:
             cursor = conn.execute("""
                 SELECT 
@@ -127,16 +166,21 @@ class PromptAnalytics:
             """, (project_name, project_name))
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_time_based_analysis(self, project_name: str = "front", days: int = 30) -> Dict:
+    def get_time_based_analysis(self, project_name: Optional[str] = None, days: int = 30) -> Dict:
         """Get time-based usage analysis.
-        
+
         Args:
             project_name: Project name to analyze
             days: Number of days to analyze
-            
+
         Returns:
             Time-based statistics
         """
+        # Resolve project name if None
+        project_name = self._resolve_project_name(project_name)
+        if not project_name:
+            return {"daily_activity": [], "hourly_distribution": []}  # No projects exist
+
         with self.storage._get_connection() as conn:
             # Daily activity
             cursor = conn.execute("""
@@ -191,7 +235,7 @@ class PromptAnalytics:
                 "most_productive_day": dict(most_productive) if most_productive else None
             }
 
-    def get_top_sessions(self, project_name: str = "front", limit: int = 10) -> List[Dict]:
+    def get_top_sessions(self, project_name: Optional[str] = None, limit: int = 10) -> List[Dict]:
         """Get most active sessions.
         
         Args:
@@ -222,7 +266,7 @@ class PromptAnalytics:
             """, (project_name, limit))
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_sensitive_data_report(self, project_name: str = "front") -> Dict:
+    def get_sensitive_data_report(self, project_name: Optional[str] = None) -> Dict:
         """Get sensitive data detection report.
         
         Args:
@@ -293,7 +337,7 @@ class PromptAnalytics:
 
     def analyze_prompt_quality(
         self,
-        project_name: str = "front",
+        project_name: Optional[str] = None,
         include_nocode: bool = False,
         include_commands: bool = False,
         filter_system: bool = True
@@ -309,6 +353,11 @@ class PromptAnalytics:
         Returns:
             List of prompts with quality scores
         """
+        # Resolve project name if None
+        project_name = self._resolve_project_name(project_name)
+        if not project_name:
+            return []  # No projects exist
+
         with self.storage._get_connection() as conn:
             query = """
                 WITH user_prompts AS (
@@ -524,7 +573,7 @@ class PromptAnalytics:
 
     def get_best_prompts(
         self,
-        project_name: str = "front",
+        project_name: Optional[str] = None,
         limit: int = 10,
         include_nocode: bool = False,
         include_commands: bool = False,
@@ -585,7 +634,7 @@ class PromptAnalytics:
 
     def get_worst_prompts(
         self,
-        project_name: str = "front",
+        project_name: Optional[str] = None,
         limit: int = 10,
         include_nocode: bool = False,
         include_commands: bool = False,
@@ -611,7 +660,7 @@ class PromptAnalytics:
         )
         return all_prompts[-limit:][::-1]  # Reverse to show worst first
 
-    def export_prompt_library(self, project_name: str = "front", output_path: Optional[Path] = None):
+    def export_prompt_library(self, project_name: Optional[str] = None, output_path: Optional[Path] = None):
         """Export prompt library as markdown.
 
         Args:
@@ -773,7 +822,7 @@ class PromptAnalytics:
 
         return output_path
 
-    def generate_full_report(self, project_name: str = "front") -> Dict:
+    def generate_full_report(self, project_name: Optional[str] = None) -> Dict:
         """Generate comprehensive analytics report.
 
         Args:

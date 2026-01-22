@@ -30,7 +30,7 @@ mcp = FastMCP("claude-x")
 
 @mcp.tool()
 def get_best_prompts(
-    project: str = "front",
+    project: Optional[str] = None,
     limit: int = 10,
     strict: bool = False,
     min_quality: Optional[float] = None,
@@ -38,7 +38,7 @@ def get_best_prompts(
     """Get best quality prompts from Claude Code sessions.
 
     Args:
-        project: Project name to analyze (default: "front")
+        project: Project name to analyze (default: None = all projects)
         limit: Maximum number of prompts to return (default: 10)
         strict: Use strict filtering (structure>=3.0, context>=2.0)
         min_quality: Minimum combined structure+context score
@@ -73,13 +73,13 @@ def get_best_prompts(
 
 @mcp.tool()
 def get_worst_prompts(
-    project: str = "front",
+    project: Optional[str] = None,
     limit: int = 10,
 ) -> dict:
     """Get prompts that need improvement from Claude Code sessions.
 
     Args:
-        project: Project name to analyze (default: "front")
+        project: Project name to analyze (default: None = all projects)
         limit: Maximum number of prompts to return (default: 10)
 
     Returns:
@@ -110,12 +110,12 @@ def get_worst_prompts(
 
 @mcp.tool()
 def analyze_sessions(
-    project: str = "front",
+    project: Optional[str] = None,
 ) -> dict:
     """Analyze Claude Code session statistics for a project.
 
     Args:
-        project: Project name to analyze (default: "front")
+        project: Project name to analyze (default: None = all projects)
 
     Returns:
         Dictionary containing session statistics including:
@@ -189,13 +189,13 @@ def score_prompt(prompt: str) -> dict:
 
 @mcp.tool()
 def get_prompt_patterns(
-    project: str = "front",
+    project: Optional[str] = None,
     limit: int = 5,
 ) -> dict:
     """Get common successful prompt patterns from your sessions.
 
     Args:
-        project: Project name to analyze (default: "front")
+        project: Project name to analyze (default: None = all projects)
         limit: Maximum number of patterns to return (default: 5)
 
     Returns:
