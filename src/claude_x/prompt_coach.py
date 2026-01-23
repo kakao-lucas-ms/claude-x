@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from typing import Any, Callable, Protocol
 import re
 
-from .analytics import PromptAnalytics
 from .extensions import detect_installed_extensions, suggest_extension_command
 from .i18n import detect_language, t
 from .patterns import analyze_prompt_for_pattern
@@ -19,18 +18,28 @@ class CoachingResult:
 
     language: str
     original_prompt: str
-    scores: Dict
-    problems: List[Dict]
-    suggestions: List[Dict]
-    extension_suggestion: Optional[Dict]
-    expected_impact: Dict
-    user_insights: List[Dict]
+    scores: "ScoreMap"
+    problems: list["PromptDict"]
+    suggestions: list["PromptDict"]
+    extension_suggestion: "PromptDict | None"
+    expected_impact: "ImpactDict"
+    user_insights: list["PromptDict"]
+
+
+PromptDict = dict[str, Any]
+ScoreMap = dict[str, float]
+ImpactDict = dict[str, dict[str, float | int | str]]
+
+
+class AnalyticsProtocol(Protocol):
+    def get_best_prompts(self, *args: Any, **kwargs: Any) -> list[PromptDict]:
+        ...
 
 
 class PromptCoach:
     """Prompt coaching engine."""
 
-    def __init__(self, analytics: PromptAnalytics):
+    def __init__(self, analytics: AnalyticsProtocol):
         self.analytics = analytics
 
     def analyze(
@@ -71,9 +80,9 @@ class PromptCoach:
             user_insights=user_insights,
         )
 
-    def identify_problems(self, prompt: str, scores: Dict, lang: str) -> List[Dict]:
+    def identify_problems(self, prompt: str, scores: ScoreMap, lang: str) -> list[PromptDict]:
         """Identify prompt problems based on heuristics and scores."""
-        problems: List[Dict] = []
+        problems: list[PromptDict] = []
         structure = scores.get("structure", 0)
         context = scores.get("context", 0)
 
@@ -97,12 +106,12 @@ class PromptCoach:
     def generate_suggestions(
         self,
         prompt: str,
-        problems: List[Dict],
-        user_best: List[Dict],
+        problems: list[PromptDict],
+        user_best: list[PromptDict],
         lang: str,
-    ) -> List[Dict]:
+    ) -> list[PromptDict]:
         """Generate improvement suggestions."""
-        suggestions: List[Dict] = []
+        suggestions: list[PromptDict] = []
 
         for best in user_best[:2]:
             prompt_text = best.get("first_prompt", "")
@@ -149,7 +158,7 @@ class PromptCoach:
 
         return suggestions[:3]
 
-    def calculate_expected_impact(self, current_scores: Dict) -> Dict:
+    def calculate_expected_impact(self, current_scores: ScoreMap) -> ImpactDict:
         """Estimate expected impact from improvements."""
         structure = current_scores.get("structure", 0.0)
         context = current_scores.get("context", 0.0)
@@ -186,7 +195,7 @@ class PromptCoach:
             },
         }
 
-    def generate_user_insights(self, user_best: List[Dict], lang: str) -> List[Dict]:
+    def generate_user_insights(self, user_best: list[PromptDict], lang: str) -> list[PromptDict]:
         """Generate user-specific insights based on best prompts."""
         if not user_best:
             return []
@@ -194,7 +203,7 @@ class PromptCoach:
         file_ratio = _ratio(user_best, _has_file_path)
         error_ratio = _ratio(user_best, _has_error_message)
 
-        insights: List[Dict] = []
+        insights: list[PromptDict] = []
         if file_ratio >= 0.6:
             insights.append(
                 {
@@ -231,13 +240,13 @@ class PromptCoach:
 
         return insights
 
-    def _get_user_best_prompts(self) -> List[Dict]:
+    def _get_user_best_prompts(self) -> list[PromptDict]:
         try:
             return self.analytics.get_best_prompts(limit=5, strict_mode=True)
         except Exception:
             return []
 
-    def _problem(self, key: str, severity: str, lang: str) -> Dict:
+    def _problem(self, key: str, severity: str, lang: str) -> PromptDict:
         return {
             "issue": key,
             "severity": severity,
@@ -246,7 +255,7 @@ class PromptCoach:
             "how_to_fix": t(f"problems.{key}.fix", lang),
         }
 
-    def _suggestion_from_issue(self, issue_key: Optional[str], lang: str) -> Optional[Dict]:
+    def _suggestion_from_issue(self, issue_key: str | None, lang: str) -> PromptDict | None:
         if issue_key == "no_file":
             return {
                 "type": "generic",
@@ -302,7 +311,7 @@ def _is_conversational(prompt: str) -> bool:
     return any(re.search(p, prompt.strip(), re.IGNORECASE) for p in patterns)
 
 
-def _ratio(prompts: List[Dict], predicate) -> float:
+def _ratio(prompts: list[PromptDict], predicate: Callable[[str], bool]) -> float:
     if not prompts:
         return 0.0
     matches = 0

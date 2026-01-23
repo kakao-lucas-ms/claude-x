@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import re
-from typing import Dict, Optional
+from typing import Any
 
 
 DEFAULT_LANGUAGE = "en"
 
 
-def detect_language(prompt: Optional[str]) -> str:
+def detect_language(prompt: str | None) -> str:
     """
     Detect prompt language.
 
@@ -29,7 +29,7 @@ def detect_language(prompt: Optional[str]) -> str:
     return "ko" if ratio > 0.3 else "en"
 
 
-TRANSLATIONS: Dict[str, Dict[str, str]] = {
+TRANSLATIONS: dict[str, dict[str, str]] = {
     "ko": {
         "analysis.title": "🤖 프롬프트 분석 결과",
         "analysis.structure": "구조",
@@ -113,7 +113,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
 }
 
 
-def t(key: str, lang: Optional[str] = None, **kwargs) -> str:
+def t(key: str, lang: str | None = None, **kwargs: Any) -> str:
     """
     Translate a key to localized text.
 
@@ -124,7 +124,8 @@ def t(key: str, lang: Optional[str] = None, **kwargs) -> str:
     """
     if lang is None:
         prompt = kwargs.get("prompt")
-        lang = detect_language(prompt) if prompt is not None else DEFAULT_LANGUAGE
+        prompt_text = prompt if isinstance(prompt, str) else None
+        lang = detect_language(prompt_text) if prompt_text is not None else DEFAULT_LANGUAGE
 
     translations = TRANSLATIONS.get(lang, TRANSLATIONS[DEFAULT_LANGUAGE])
     template = translations.get(key, key)

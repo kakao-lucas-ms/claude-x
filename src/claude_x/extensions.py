@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any
 import re
 
 
-KNOWN_EXTENSIONS: Dict[str, Dict] = {
+KNOWN_EXTENSIONS: dict[str, dict[str, Any]] = {
     "superclaude": {
         "name": "SuperClaude",
         "detection": [
@@ -65,9 +65,9 @@ KNOWN_EXTENSIONS: Dict[str, Dict] = {
 }
 
 
-def detect_installed_extensions() -> List[str]:
+def detect_installed_extensions() -> list[str]:
     """Detect installed extensions by rules."""
-    installed = []
+    installed: list[str] = []
     for ext_name in KNOWN_EXTENSIONS.keys():
         if is_extension_installed(ext_name):
             installed.append(ext_name)
@@ -95,14 +95,14 @@ def is_extension_installed(ext_name: str) -> bool:
     return False
 
 
-def suggest_extension_command(prompt: str, installed: List[str]) -> Optional[Dict]:
+def suggest_extension_command(prompt: str, installed: list[str]) -> dict[str, Any] | None:
     """
     Suggest an extension command based on prompt and installed extensions.
     """
     if not prompt or not installed:
         return None
 
-    best = None
+    best: dict[str, Any] | None = None
     for ext_key in installed:
         ext = KNOWN_EXTENSIONS.get(ext_key, {})
         commands = ext.get("commands", {})
@@ -128,7 +128,7 @@ def suggest_extension_command(prompt: str, installed: List[str]) -> Optional[Dic
     return best
 
 
-def calculate_confidence(prompt: str, triggers: List[str], boost: float) -> float:
+def calculate_confidence(prompt: str, triggers: list[str], boost: float) -> float:
     """
     Calculate command matching confidence.
 
