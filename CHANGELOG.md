@@ -2,6 +2,17 @@
 
 All notable changes to Claude-X will be documented in this file.
 
+## [0.4.0] - 2026-01-30
+
+### ✨ Added
+
+- 프롬프트 코칭 엔진 (문제점 식별, 개선 제안, 예상 효과 계산)
+- 다국어 지원 (한국어/영어 자동 감지)
+- 확장 시스템 탐지 및 명령어 추천 (SuperClaude, oh-my-opencode)
+- MCP tool: `analyze_and_improve_prompt`
+- CLI command: `cx coach`
+- 프롬프트 코칭 가이드 문서
+
 ## [0.3.7] - 2026-01-23
 
 ### ✨ Added
