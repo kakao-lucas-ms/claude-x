@@ -2,6 +2,45 @@
 
 All notable changes to Claude-X will be documented in this file.
 
+## [0.3.7] - 2026-01-23
+
+### ✨ Added
+
+#### MCP Server Enhancements
+- **Reusable Templates**: `get_best_prompts` now returns `reuse_ready` with auto-extracted templates
+  - Automatic placeholder detection (`[URL]`, `[FILE_NAME]`, etc.)
+  - Pattern type classification (reference_based, generic)
+  - Fill guide with usage examples
+  - Reuse checklist for better prompts
+- **LLM-Friendly Summaries**: `analyze_sessions` now includes:
+  - `llm_summary`: Quick insights (top language, category, peak hour)
+  - `next_actions`: Actionable recommendations for prompt improvement
+- **Pattern Analysis**: Enhanced `get_prompt_patterns` with:
+  - Real usage-based templates with placeholders
+  - Quality scoring for each pattern
+  - Top reusable templates ranking
+
+#### CLI Commands
+- **Watch Mode**: New `cx watch` command for real-time session monitoring
+  - Auto-import new sessions as they are created
+  - Configurable debounce timer (default: 2s)
+  - Incremental import with offset tracking
+  - Project filtering support
+
+### 🔧 Changed
+- **Code Organization**: Extracted `_import_sessions` as shared utility function
+- **Storage Layer**: Graceful handling of UNIQUE INDEX for message deduplication
+- **Incremental Import**: Added `get_session_offsets` for resumable imports
+
+### 🐛 Fixed
+- UNIQUE constraint failures on existing databases now handled gracefully
+- Duplicate message prevention with INSERT OR IGNORE
+
+### 🚀 Performance
+- Incremental import reduces duplicate processing
+- File mtime tracking for change detection
+- Offset-based resume for large sessions
+
 ## [0.1.1] - 2026-01-21
 
 ### Changed

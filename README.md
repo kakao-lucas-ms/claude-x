@@ -63,19 +63,22 @@ cx import
 # 1. 전체 세션 가져오기
 cx import
 
-# 2. 통계 확인
+# 2. 실시간 모니터링 (백그라운드)
+cx watch &
+
+# 3. 통계 확인
 cx stats
 
-# 3. 최근 세션 목록
+# 4. 최근 세션 목록
 cx list --limit 10
 
-# 4. 코드 검색
+# 5. 코드 검색
 cx search "useState" --lang typescript
 
-# 5. 프롬프트 분석
+# 6. 프롬프트 분석
 cx prompts --best-only --limit 5
 
-# 6. 템플릿 라이브러리
+# 7. 템플릿 라이브러리
 cx templates
 ```
 
@@ -381,6 +384,83 @@ cx templates --export
 
 **생성 파일:**
 - `~/.claude-x/prompt-templates.md` (596줄)
+
+---
+
+### cx watch
+실시간 세션 모니터링 및 자동 import
+
+```bash
+# 백그라운드에서 실행
+cx watch &
+
+# 프로젝트 필터링
+cx watch --project my-project
+
+# Debounce 시간 조정 (기본: 2초)
+cx watch --debounce 5.0
+```
+
+**기능:**
+- 새로운 세션 파일 자동 감지
+- Incremental import (변경된 부분만 처리)
+- 파일 mtime 기반 중복 방지
+- Offset 추적으로 중단/재개 지원
+
+**사용 시나리오:**
+```bash
+# 터미널 1: watch 실행
+cx watch
+
+# 터미널 2: Claude Code 작업
+# → 새 세션이 자동으로 import됨
+
+# 실시간 통계 확인
+cx stats
+```
+
+---
+
+## 🔌 MCP Server Integration
+
+Claude-X는 MCP(Model Context Protocol) 서버를 제공하여 Claude Code에서 직접 데이터를 조회할 수 있습니다.
+
+### 사용 가능한 MCP Tools
+
+#### 1. `analyze_sessions`
+세션 통계 및 LLM 친화적 요약
+
+**새로운 기능 (v0.3.7):**
+- `llm_summary`: 주요 언어, 카테고리, 피크 시간 요약
+- `next_actions`: 프롬프트 개선을 위한 실행 가능한 제안
+
+#### 2. `get_best_prompts`
+고품질 프롬프트 추출 및 재사용 템플릿
+
+**새로운 기능 (v0.3.7):**
+- `reuse_ready`: 자동 추출된 재사용 가능한 템플릿
+  - Placeholder 자동 감지 (`[URL]`, `[FILE_NAME]` 등)
+  - 패턴 타입 분류 (reference_based, generic)
+  - 채우기 가이드 및 체크리스트
+- `reuse_guidance`: 템플릿 활용 가이드
+
+#### 3. `get_prompt_patterns`
+성공한 프롬프트 패턴 분석
+
+**새로운 기능 (v0.3.7):**
+- 실제 사용 기반 템플릿 자동 생성
+- 품질 점수 기반 랭킹
+- 재사용 가능한 템플릿 추천
+
+**사용 예시:**
+```
+# Claude Code에서 직접 사용
+User: "내 프롬프트 사용 패턴을 분석해줘"
+→ analyze_sessions MCP tool 자동 호출
+
+User: "좋은 프롬프트 예시 보여줘"
+→ get_best_prompts MCP tool 자동 호출
+```
 
 ---
 
