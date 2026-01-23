@@ -11,7 +11,7 @@ class CodeExtractor:
 
     # Regex pattern for markdown code blocks
     CODE_BLOCK_PATTERN = re.compile(
-        r"```(\w+)?\n(.*?)```",
+        r"```([\w+-]+)?\n(.*?)```",
         re.DOTALL | re.MULTILINE
     )
 
@@ -38,7 +38,7 @@ class CodeExtractor:
         matches = self.CODE_BLOCK_PATTERN.finditer(content)
 
         for match in matches:
-            language = match.group(1) or "text"
+            language = self.normalize_language(match.group(1) or "text")
             code = match.group(2).strip()
 
             if not code:

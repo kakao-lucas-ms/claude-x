@@ -3,7 +3,7 @@
 import sqlite3
 from pathlib import Path
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 from contextlib import contextmanager
 
 from .models import Project, Session, Message, CodeSnippet
@@ -121,6 +121,18 @@ class Storage:
             """)
             conn.commit()
 
+            # Try to create unique index for messages deduplication
+            # May fail if duplicate data exists - that's OK, we handle duplicates in insert
+            try:
+                conn.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_unique
+                    ON messages(session_id, timestamp, type, content)
+                """)
+                conn.commit()
+            except sqlite3.IntegrityError:
+                # Duplicate data exists, skip index creation
+                pass
+
     def insert_project(self, project: Project) -> int:
         """Insert or get existing project.
 
@@ -192,12 +204,24 @@ class Storage:
         with self._get_connection() as conn:
             cursor = conn.execute(
                 """
-                INSERT INTO messages (session_id, type, content, timestamp, has_code)
+                INSERT OR IGNORE INTO messages (session_id, type, content, timestamp, has_code)
                 VALUES (?, ?, ?, ?, ?)
                 """,
                 (message.session_id, message.type, message.content, message.timestamp, message.has_code)
             )
             message_id = cursor.lastrowid
+            if not message_id:
+                cursor = conn.execute(
+                    """
+                    SELECT id FROM messages
+                    WHERE session_id = ? AND type = ? AND content = ? AND timestamp = ?
+                    LIMIT 1
+                    """,
+                    (message.session_id, message.type, message.content, message.timestamp)
+                )
+                row = cursor.fetchone()
+                message_id = row[0] if row else 0
+            message_id = int(message_id or 0)
             conn.commit()
             return message_id
 
@@ -248,6 +272,7 @@ class Storage:
                     cs.language,
                     cs.code,
                     cs.line_count,
+                    cs.has_sensitive,
                     cs.session_id,
                     COALESCE(
                         (SELECT content
@@ -260,7 +285,7 @@ class Storage:
                     ) as first_prompt,
                     s.git_branch,
                     p.name as project_name,
-                    rank
+                    bm25(code_fts) as rank
                 FROM code_fts
                 JOIN code_snippets cs ON code_fts.rowid = cs.id
                 JOIN sessions s ON cs.session_id = s.session_id
@@ -268,7 +293,7 @@ class Storage:
                 WHERE code_fts MATCH ?
             """
 
-            params = [query]
+            params: list[object] = [query]
 
             if language:
                 sql += " AND cs.language = ?"
@@ -279,6 +304,33 @@ class Storage:
 
             cursor = conn.execute(sql, params)
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_session_offsets(self, session_id: str) -> Optional[Dict[str, int]]:
+        """Get last read offset and file mtime for a session.
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            Dict with last_read_offset and file_mtime, or None
+        """
+        with self._get_connection() as conn:
+            cursor = conn.execute(
+                """
+                SELECT last_read_offset, file_mtime
+                FROM sessions
+                WHERE session_id = ?
+                LIMIT 1
+                """,
+                (session_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "last_read_offset": row[0] or 0,
+                "file_mtime": row[1] or 0,
+            }
 
     def get_session_stats(self, project_name: Optional[str] = None) -> dict:
         """Get statistics.
@@ -313,6 +365,10 @@ class Storage:
                 params
             )
             return dict(cursor.fetchone())
+
+    def get_stats(self, project_name: Optional[str] = None) -> dict:
+        """Backward-compatible stats accessor."""
+        return self.get_session_stats(project_name=project_name)
 
     def list_sessions(
         self,

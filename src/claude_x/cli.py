@@ -2,6 +2,7 @@
 
 import json
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 import typer
@@ -9,6 +10,8 @@ from rich.console import Console
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from datetime import datetime
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 from .indexer import SessionIndexer
 from .session_parser import SessionParser
@@ -46,6 +49,97 @@ def claude_code_exists() -> bool:
     claude_dir = Path.home() / ".claude"
     projects_dir = claude_dir / "projects"
     return projects_dir.exists()
+
+
+def _import_sessions(
+    storage: Storage,
+    indexer: SessionIndexer,
+    extractor: CodeExtractor,
+    scanner: SecurityScanner,
+    project: Optional[str] = None,
+    incremental: bool = True,
+    progress=None,
+    progress_task=None,
+) -> dict:
+    counts = {"sessions": 0, "messages": 0, "snippets": 0}
+
+    for project_dir, session_entry in indexer.iter_all_sessions():
+        # Filter by project if specified
+        if project:
+            project_name = indexer.extract_project_name(session_entry.project_path or "")
+            if project.lower() not in project_name.lower():
+                continue
+
+        try:
+            # Insert project
+            project_path = indexer.decode_project_path(project_dir.name)
+            project_model = Project(
+                path=project_path,
+                encoded_path=project_dir.name,
+                name=indexer.extract_project_name(project_path)
+            )
+            project_id = storage.insert_project(project_model)
+
+            # Determine incremental offsets
+            existing = storage.get_session_offsets(session_entry.session_id)
+            existing_offset = existing["last_read_offset"] if existing else 0
+            existing_mtime = existing["file_mtime"] if existing else 0
+
+            session_model = Session(
+                session_id=session_entry.session_id,
+                project_id=project_id,
+                full_path=session_entry.full_path,
+                first_prompt=session_entry.first_prompt,
+                message_count=session_entry.message_count,
+                git_branch=session_entry.git_branch,
+                is_sidechain=session_entry.is_sidechain,
+                file_mtime=session_entry.file_mtime,
+                last_read_offset=existing_offset,
+                created_at=datetime.fromisoformat(session_entry.created.replace("Z", "+00:00")),
+                modified_at=datetime.fromisoformat(session_entry.modified.replace("Z", "+00:00"))
+            )
+            storage.insert_session(session_model)
+            counts["sessions"] += 1
+
+            # Parse messages
+            session_path = Path(session_entry.full_path)
+            if not session_path.exists():
+                continue
+
+            if incremental and existing and session_entry.file_mtime and session_entry.file_mtime <= existing_mtime:
+                continue
+
+            start_offset = existing_offset if incremental else 0
+            parser = SessionParser(session_path)
+            for message in parser.parse_messages(session_entry.session_id, offset=start_offset):
+                message_id = storage.insert_message(message)
+                if not message_id:
+                    continue
+                counts["messages"] += 1
+
+                if message.has_code:
+                    for snippet in extractor.extract_code_blocks(
+                        message_id, session_entry.session_id, message.content
+                    ):
+                        snippet.has_sensitive = scanner.has_sensitive_data(snippet.code)
+                        if storage.insert_code_snippet(snippet):
+                            counts["snippets"] += 1
+
+            session_model.last_read_offset = parser.get_current_offset()
+            storage.insert_session(session_model)
+
+            if progress is not None and progress_task is not None:
+                progress.update(
+                    progress_task,
+                    description=(
+                        f"Imported {counts['sessions']} sessions, "
+                        f"{counts['messages']} messages, {counts['snippets']} code snippets"
+                    )
+                )
+        except Exception:
+            continue
+
+    return counts
 
 
 def version_callback(value: bool):
@@ -159,12 +253,6 @@ def init(
             console.print("\n[bold cyan]📥 Importing existing Claude Code sessions...[/bold cyan]")
 
             # Import sessions using the same logic as cx import
-            from .indexer import SessionIndexer
-            from .extractor import CodeExtractor
-            from .security import SecurityScanner
-            from .parser import SessionParser
-            from .models import Project, Session
-
             indexer = SessionIndexer()
             extractor = CodeExtractor()
             scanner = SecurityScanner()
@@ -176,51 +264,17 @@ def init(
                 console=console
             ) as progress:
                 task = progress.add_task("Importing...", total=None)
-
-                for project_dir, session_entry in indexer.iter_all_sessions():
-                    try:
-                        # Insert project
-                        project_path = indexer.decode_project_path(project_dir.name)
-                        project_model = Project(
-                            path=project_path,
-                            encoded_path=project_dir.name,
-                            name=indexer.extract_project_name(project_path)
-                        )
-                        project_id = storage.insert_project(project_model)
-
-                        # Insert session
-                        session_model = Session(
-                            session_id=session_entry.session_id,
-                            project_id=project_id,
-                            full_path=session_entry.full_path,
-                            first_prompt=session_entry.first_prompt,
-                            message_count=session_entry.message_count,
-                            git_branch=session_entry.git_branch,
-                            is_sidechain=session_entry.is_sidechain,
-                            file_mtime=session_entry.file_mtime,
-                            created_at=datetime.fromisoformat(session_entry.created.replace("Z", "+00:00")),
-                            modified_at=datetime.fromisoformat(session_entry.modified.replace("Z", "+00:00"))
-                        )
-                        storage.insert_session(session_model)
-                        import_count += 1
-
-                        # Parse messages and code (simplified for init)
-                        session_path = Path(session_entry.full_path)
-                        if session_path.exists():
-                            parser = SessionParser(session_path)
-                            for message in parser.parse_messages(session_entry.session_id):
-                                message_id = storage.insert_message(message)
-                                if message.has_code:
-                                    for snippet in extractor.extract_code_blocks(
-                                        message_id, session_entry.session_id, message.content
-                                    ):
-                                        snippet.has_sensitive = scanner.has_sensitive_data(snippet.code)
-                                        storage.insert_code_snippet(snippet)
-
-                        progress.update(task, description=f"Imported {import_count} sessions...")
-                    except Exception:
-                        # Skip problematic sessions silently
-                        continue
+                counts = _import_sessions(
+                    storage=storage,
+                    indexer=indexer,
+                    extractor=extractor,
+                    scanner=scanner,
+                    project=None,
+                    incremental=True,
+                    progress=progress,
+                    progress_task=task,
+                )
+                import_count = counts["sessions"]
 
             session_count = import_count
             if import_count > 0:
@@ -430,80 +484,98 @@ def import_sessions(
     extractor = CodeExtractor()
     scanner = SecurityScanner()
 
-    total_sessions = 0
-    total_messages = 0
-    total_snippets = 0
-
     with Progress(
         SpinnerColumn(),
         TextColumn("[progress.description]{task.description}"),
         console=console
     ) as progress:
         task = progress.add_task("Importing sessions...", total=None)
-
-        for project_dir, session_entry in indexer.iter_all_sessions():
-            # Filter by project if specified
-            if project:
-                project_name = indexer.extract_project_name(session_entry.project_path or "")
-                if project.lower() not in project_name.lower():
-                    continue
-
-            # Insert project
-            project_path = indexer.decode_project_path(project_dir.name)
-            project_model = Project(
-                path=project_path,
-                encoded_path=project_dir.name,
-                name=indexer.extract_project_name(project_path)
-            )
-            project_id = storage.insert_project(project_model)
-
-            # Insert session
-            session_model = Session(
-                session_id=session_entry.session_id,
-                project_id=project_id,
-                full_path=session_entry.full_path,
-                first_prompt=session_entry.first_prompt,
-                message_count=session_entry.message_count,
-                git_branch=session_entry.git_branch,
-                is_sidechain=session_entry.is_sidechain,
-                file_mtime=session_entry.file_mtime,
-                created_at=datetime.fromisoformat(session_entry.created.replace("Z", "+00:00")),
-                modified_at=datetime.fromisoformat(session_entry.modified.replace("Z", "+00:00"))
-            )
-            storage.insert_session(session_model)
-            total_sessions += 1
-
-            # Parse messages
-            session_path = Path(session_entry.full_path)
-            if not session_path.exists():
-                continue
-
-            parser = SessionParser(session_path)
-            for message in parser.parse_messages(session_entry.session_id):
-                message_id = storage.insert_message(message)
-                total_messages += 1
-
-                # Extract code blocks
-                if message.has_code:
-                    for snippet in extractor.extract_code_blocks(
-                        message_id, session_entry.session_id, message.content
-                    ):
-                        # Scan for sensitive data
-                        snippet.has_sensitive = scanner.has_sensitive_data(snippet.code)
-
-                        # Insert snippet
-                        if storage.insert_code_snippet(snippet):
-                            total_snippets += 1
-
-            progress.update(
-                task,
-                description=f"Imported {total_sessions} sessions, {total_messages} messages, {total_snippets} code snippets"
-            )
+        counts = _import_sessions(
+            storage=storage,
+            indexer=indexer,
+            extractor=extractor,
+            scanner=scanner,
+            project=project,
+            incremental=True,
+            progress=progress,
+            progress_task=task,
+        )
 
     console.print(f"\n✅ Import complete!")
-    console.print(f"  Sessions: {total_sessions}")
-    console.print(f"  Messages: {total_messages}")
-    console.print(f"  Code Snippets: {total_snippets}")
+    console.print(f"  Sessions: {counts['sessions']}")
+    console.print(f"  Messages: {counts['messages']}")
+    console.print(f"  Code Snippets: {counts['snippets']}")
+
+
+@app.command()
+def watch(
+    project: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project name"),
+    debounce: float = typer.Option(2.0, "--debounce", help="Debounce seconds for import"),
+):
+    """Watch Claude Code sessions and import incrementally."""
+    storage = get_storage()
+    indexer = SessionIndexer()
+    extractor = CodeExtractor()
+    scanner = SecurityScanner()
+
+    projects_dir = Path.home() / ".claude" / "projects"
+    if not projects_dir.exists():
+        console.print("[red]Claude Code projects directory not found: ~/.claude/projects[/red]")
+        return
+
+    import_in_progress = False
+
+    def run_import():
+        nonlocal import_in_progress
+        if import_in_progress:
+            return
+        import_in_progress = True
+        try:
+            counts = _import_sessions(
+                storage=storage,
+                indexer=indexer,
+                extractor=extractor,
+                scanner=scanner,
+                project=project,
+                incremental=True,
+            )
+            if counts["messages"] or counts["snippets"]:
+                console.print(
+                    f"✅ Imported {counts['sessions']} sessions, {counts['messages']} messages, {counts['snippets']} snippets"
+                )
+        finally:
+            import_in_progress = False
+
+    class SessionWatchHandler(FileSystemEventHandler):
+        def __init__(self, debounce_seconds: float):
+            self.debounce_seconds = debounce_seconds
+            self.last_run = 0.0
+
+        def on_any_event(self, event):
+            if event.is_directory:
+                return
+            path = str(event.src_path)
+            if not (path.endswith(".jsonl") or path.endswith("sessions-index.json")):
+                return
+            now = time.time()
+            if now - self.last_run < self.debounce_seconds:
+                return
+            self.last_run = now
+            run_import()
+
+    handler = SessionWatchHandler(debounce)
+    observer = Observer()
+    observer.schedule(handler, str(projects_dir), recursive=True)
+    observer.start()
+
+    console.print("👀 Watching Claude Code sessions (Ctrl+C to stop)...")
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        console.print("\nStopped watching.")
+        observer.stop()
+    observer.join()
 
 
 @app.command("list")
@@ -547,7 +619,8 @@ def search(
     lang: Optional[str] = typer.Option(None, "--lang", "-l", help="Filter by language"),
     project: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project"),
     limit: int = typer.Option(10, "--limit", help="Max results"),
-    full: bool = typer.Option(False, "--full", "-f", help="Show full text without truncation")
+    full: bool = typer.Option(False, "--full", "-f", help="Show full text without truncation"),
+    show_sensitive: bool = typer.Option(False, "--show-sensitive", help="Show sensitive snippets")
 ):
     """Search code snippets using full-text search."""
     storage = get_storage()
@@ -568,7 +641,8 @@ def search(
         console.print(f"  Project: [green]{result['project_name']}[/green]")
         console.print(f"  Branch: [yellow]{result['git_branch'] or 'N/A'}[/yellow]")
         console.print(f"  Language: [blue]{result['language']}[/blue]")
-        console.print(f"  Lines: {result['line_count']}")
+        sensitive_marker = " ⚠️" if result.get("has_sensitive") else ""
+        console.print(f"  Lines: {result['line_count']}{sensitive_marker}")
 
         # Show prompt (always show full text - it's important context)
         prompt_text = result['first_prompt']
@@ -576,11 +650,15 @@ def search(
 
         # Show code (truncate unless --full flag)
         code_text = result['code']
+        if result.get("has_sensitive") and not show_sensitive:
+            code_text = "[REDACTED]"
         if full or len(code_text) <= 500:
             console.print(f"\n[dim]{code_text}[/dim]\n")
         else:
             console.print(f"\n[dim]{code_text[:500]}...[/dim]\n")
             console.print(f"[dim]💡 Use --full to see complete code[/dim]\n")
+        if result.get("has_sensitive") and not show_sensitive:
+            console.print(f"[dim]💡 Use --show-sensitive to view redacted content[/dim]\n")
 
 
 @app.command()
@@ -606,7 +684,8 @@ def stats(
 @app.command()
 def show(
     session_id: str,
-    code_only: bool = typer.Option(False, "--code", help="Show only code snippets")
+    code_only: bool = typer.Option(False, "--code", help="Show only code snippets"),
+    show_sensitive: bool = typer.Option(False, "--show-sensitive", help="Show sensitive snippets")
 ):
     """Show session details or code snippets."""
     storage = get_storage()
@@ -633,7 +712,13 @@ def show(
         for i, snippet in enumerate(snippets, 1):
             sensitive_marker = " ⚠️" if snippet.get("has_sensitive") else ""
             console.print(f"[bold]Snippet {i}[/bold] ([blue]{snippet['language']}[/blue], {snippet['line_count']} lines){sensitive_marker}")
-            console.print(f"[dim]{snippet['code'][:300]}{'...' if len(snippet['code']) > 300 else ''}[/dim]\n")
+            code_preview = snippet["code"]
+            if snippet.get("has_sensitive") and not show_sensitive:
+                code_preview = "[REDACTED]"
+            preview_text = code_preview[:300] if code_preview else ""
+            console.print(f"[dim]{preview_text}{'...' if len(code_preview) > 300 else ''}[/dim]\n")
+            if snippet.get("has_sensitive") and not show_sensitive:
+                console.print(f"[dim]💡 Use --show-sensitive to view redacted content[/dim]\n")
     else:
         # Show full session details
         console.print(f"\n[bold cyan]Session Details[/bold cyan]")
@@ -849,7 +934,8 @@ def prompts(
         console=console
     ) as progress:
         task = progress.add_task("Analyzing prompt quality...", total=None)
-
+        best = []
+        worst = []
         if not worst_only:
             best = analytics.get_best_prompts(
                 project,

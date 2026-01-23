@@ -31,7 +31,7 @@ class PromptLibrary:
         Args:
             storage_path: Path to store the library JSON file
         """
-        self.storage_path = storage_path or Path.home() / ".claude_x" / "prompt_library.json"
+        self.storage_path = storage_path or Path.home() / ".claude-x" / "prompt_library.json"
         self.patterns: Dict[str, PromptPattern] = {}
         self._load()
 

@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from typing import Optional
+import re
 from mcp.server.fastmcp import FastMCP
 
 from .analytics import PromptAnalytics
@@ -10,6 +11,11 @@ from .scoring import (
     calculate_structure_score,
     calculate_context_score,
     calculate_composite_score_v2,
+)
+from .patterns import (
+    analyze_prompt_for_pattern,
+    extract_patterns_from_prompts,
+    get_pattern_recommendations,
 )
 
 
@@ -54,9 +60,49 @@ def get_best_prompts(
         min_quality=min_quality,
     )
 
+    reuse_ready = []
+    for prompt in prompts:
+        prompt_text = prompt.get("first_prompt", "")
+        analysis = analyze_prompt_for_pattern(prompt_text)
+        placeholders = []
+        if analysis.get("template"):
+            placeholders = list(set(re.findall(r"\[([A-Z_]+)\]", analysis["template"])))
+
+        template = analysis.get("template", "")
+        template_preview = template
+        if template:
+            template_preview = re.sub(r"\[([A-Z_]+)\]", r"<\1>", template)
+
+        fill_guide = {
+            "fill_order": placeholders,
+            "example": template_preview,
+            "tip": "Replace <PLACEHOLDER> with your concrete target/context before sending.",
+        }
+
+        reuse_ready.append({
+            "prompt": prompt_text,
+            "template": analysis.get("template", ""),
+            "pattern_type": analysis.get("pattern_type"),
+            "pattern_description": analysis.get("pattern_description"),
+            "category": analysis.get("category"),
+            "tags": analysis.get("tags", []),
+            "quality_score": analysis.get("quality_score", 0.0),
+            "placeholders": placeholders,
+            "template_preview": template_preview,
+            "fill_guide": fill_guide,
+            "reuse_checklist": [
+                "target/file/path", "action verb", "constraints", "expected outcome", "tech stack"
+            ],
+        })
+
     result = {
         "count": len(prompts),
         "prompts": prompts,
+        "reuse_ready": reuse_ready,
+        "reuse_guidance": {
+            "goal": "Make prompts reusable in your next session",
+            "how": "Use the template, fill placeholders, and keep a clear action + context",
+        },
     }
 
     # Add helpful message if no data
@@ -130,11 +176,16 @@ def analyze_sessions(
     # Check if we have any sessions
     sessions = list(storage.list_sessions(project_name=project))
 
+    time_analysis = analytics.get_time_based_analysis(project_name=project)
+    language_distribution = analytics.get_language_distribution(project_name=project)
+    category_stats = analytics.get_category_stats(project_name=project)
+    branch_productivity = analytics.get_branch_productivity(project_name=project)
+
     result = {
-        "time_analysis": analytics.get_time_based_analysis(project_name=project),
-        "language_distribution": analytics.get_language_distribution(project_name=project),
-        "category_stats": analytics.get_category_stats(project_name=project),
-        "branch_productivity": analytics.get_branch_productivity(project_name=project),
+        "time_analysis": time_analysis,
+        "language_distribution": language_distribution,
+        "category_stats": category_stats,
+        "branch_productivity": branch_productivity,
     }
 
     # Add helpful message if no data
@@ -145,6 +196,24 @@ def analyze_sessions(
             "2. Just use Claude Code normally - sessions are auto-saved to ~/.claude/projects/\n"
             "3. Make sure you've used Claude Code at least once since installing claude-x"
         )
+        return result
+
+    top_language = language_distribution[0]["language"] if language_distribution else "N/A"
+    top_category = category_stats[0]["category"] if category_stats else "N/A"
+    peak_hour = time_analysis.get("hour_distribution", [])
+    peak_hour = peak_hour[0]["hour"] if peak_hour else "N/A"
+
+    result["llm_summary"] = {
+        "top_language": top_language,
+        "top_category": top_category,
+        "peak_hour": peak_hour,
+        "note": "Use these signals to craft reusable prompts for your dominant work patterns.",
+    }
+    result["next_actions"] = [
+        "Use get_best_prompts to extract reusable templates",
+        "Use get_prompt_patterns to build a personal prompt library",
+        "Write prompts with clear target + action + constraints",
+    ]
 
     return result
 
@@ -208,39 +277,24 @@ def get_prompt_patterns(
         strict_mode=True,
     )
 
-    # Extract patterns from best prompts
-    patterns = {
-        "file_references": 0,
-        "technology_mentions": 0,
-        "clear_goals": 0,
-        "code_blocks": 0,
-        "questions": 0,
-    }
-
-    examples = []
-    for p in best_prompts[:limit]:
-        prompt_text = p.get("prompt", "")
-        if "/" in prompt_text or "." in prompt_text:
-            patterns["file_references"] += 1
-        if any(tech in prompt_text.lower() for tech in ["react", "typescript", "python", "javascript"]):
-            patterns["technology_mentions"] += 1
-        if any(goal in prompt_text for goal in ["해줘", "fix", "add", "implement", "create"]):
-            patterns["clear_goals"] += 1
-        if "```" in prompt_text:
-            patterns["code_blocks"] += 1
-        if "?" in prompt_text:
-            patterns["questions"] += 1
-
-        examples.append({
-            "prompt": prompt_text[:100] + "..." if len(prompt_text) > 100 else prompt_text,
-            "score": p.get("composite_score", 0),
-            "category": p.get("category", "unknown"),
+    extracted_patterns = extract_patterns_from_prompts(best_prompts, min_quality=5.0)
+    reusable_templates = [p.to_dict() for p in extracted_patterns[:limit]]
+    top_reusable = []
+    for pattern in extracted_patterns[:3]:
+        top_reusable.append({
+            "template": pattern.template,
+            "pattern_type": pattern.pattern_type,
+            "avg_score": pattern.avg_score,
+            "usage_count": pattern.usage_count,
+            "example": pattern.examples[0] if pattern.examples else "",
         })
+    recommendations = get_pattern_recommendations(limit=limit)
 
     result = {
-        "patterns": patterns,
-        "top_examples": examples,
-        "recommendation": "Include file paths, technology names, and clear action verbs for best results.",
+        "reusable_templates": reusable_templates,
+        "top_reusable": top_reusable,
+        "recommendations": recommendations,
+        "recommendation": "Use reusable templates with placeholders, then fill target/action/context.",
     }
 
     # Add helpful message if no data
