@@ -182,10 +182,10 @@ class PromptAnalytics:
             return {"daily_activity": [], "hourly_distribution": []}  # No projects exist
 
         with self.storage._get_connection() as conn:
-            # Daily activity
+            # Daily activity (convert UTC to KST/UTC+9)
             cursor = conn.execute("""
-                SELECT 
-                    DATE(s.created_at) as date,
+                SELECT
+                    DATE(datetime(s.created_at, '+9 hours')) as date,
                     COUNT(DISTINCT s.session_id) as sessions,
                     COUNT(DISTINCT m.id) as messages,
                     COUNT(DISTINCT cs.id) as code_snippets
@@ -193,17 +193,17 @@ class PromptAnalytics:
                 JOIN projects p ON s.project_id = p.id
                 LEFT JOIN messages m ON s.session_id = m.session_id
                 LEFT JOIN code_snippets cs ON m.id = cs.message_id
-                WHERE p.name = ? 
-                    AND s.created_at >= datetime('now', '-' || ? || ' days')
-                GROUP BY DATE(s.created_at)
+                WHERE p.name = ?
+                    AND datetime(s.created_at, '+9 hours') >= datetime('now', '+9 hours', '-' || ? || ' days')
+                GROUP BY DATE(datetime(s.created_at, '+9 hours'))
                 ORDER BY date DESC
             """, (project_name, days))
             daily_activity = [dict(row) for row in cursor.fetchall()]
 
-            # Hour distribution
+            # Hour distribution (convert UTC to KST/UTC+9)
             cursor = conn.execute("""
-                SELECT 
-                    CAST(strftime('%H', s.created_at) AS INTEGER) as hour,
+                SELECT
+                    CAST(strftime('%H', datetime(s.created_at, '+9 hours')) AS INTEGER) as hour,
                     COUNT(DISTINCT s.session_id) as sessions
                 FROM sessions s
                 JOIN projects p ON s.project_id = p.id
@@ -213,17 +213,17 @@ class PromptAnalytics:
             """, (project_name,))
             hour_distribution = [dict(row) for row in cursor.fetchall()]
 
-            # Most productive day
+            # Most productive day (convert UTC to KST/UTC+9)
             cursor = conn.execute("""
-                SELECT 
-                    DATE(s.created_at) as date,
+                SELECT
+                    DATE(datetime(s.created_at, '+9 hours')) as date,
                     COUNT(DISTINCT cs.id) as code_count
                 FROM sessions s
                 JOIN projects p ON s.project_id = p.id
                 LEFT JOIN messages m ON s.session_id = m.session_id
                 LEFT JOIN code_snippets cs ON m.id = cs.message_id
                 WHERE p.name = ?
-                GROUP BY DATE(s.created_at)
+                GROUP BY DATE(datetime(s.created_at, '+9 hours'))
                 ORDER BY code_count DESC
                 LIMIT 1
             """, (project_name,))
