@@ -33,7 +33,12 @@ class PromptCoach:
     def __init__(self, analytics: PromptAnalytics):
         self.analytics = analytics
 
-    def analyze(self, prompt: str, detect_extensions: bool = True) -> CoachingResult:
+    def analyze(
+        self,
+        prompt: str,
+        detect_extensions: bool = True,
+        include_history: bool = True,
+    ) -> CoachingResult:
         """Analyze a prompt and return coaching result."""
         lang = detect_language(prompt)
 
@@ -44,7 +49,7 @@ class PromptCoach:
 
         problems = self.identify_problems(prompt, scores, lang)
 
-        user_best = self._get_user_best_prompts()
+        user_best = self._get_user_best_prompts() if include_history else []
         suggestions = self.generate_suggestions(prompt, problems, user_best, lang)
 
         extension_suggestion = None

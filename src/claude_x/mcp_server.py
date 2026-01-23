@@ -17,6 +17,7 @@ from .patterns import (
     extract_patterns_from_prompts,
     get_pattern_recommendations,
 )
+from .prompt_coach import PromptCoach
 
 
 def get_storage() -> Storage:
@@ -257,6 +258,40 @@ def score_prompt(prompt: str) -> dict:
 
 
 @mcp.tool()
+def analyze_and_improve_prompt(
+    prompt: str,
+    detect_extensions: bool = True,
+    include_history: bool = True,
+) -> dict:
+    """
+    Analyze a prompt and provide improvement suggestions.
+
+    Args:
+        prompt: Prompt text to analyze
+        detect_extensions: Whether to detect extensions
+        include_history: Whether to use user history
+
+    Returns:
+        Coaching result with LLM-friendly summary
+    """
+    analytics = get_analytics()
+    coach = PromptCoach(analytics)
+
+    result = coach.analyze(
+        prompt=prompt,
+        detect_extensions=detect_extensions,
+        include_history=include_history,
+    )
+
+    llm_summary = generate_llm_summary(result)
+
+    return {
+        **result.__dict__,
+        "llm_summary": llm_summary,
+    }
+
+
+@mcp.tool()
 def get_prompt_patterns(
     project: Optional[str] = None,
     limit: int = 5,
@@ -307,6 +342,121 @@ def get_prompt_patterns(
         )
 
     return result
+
+
+def generate_llm_summary(result) -> str:
+    """Generate a human-readable summary for LLM consumption."""
+    lang = result.language
+
+    if lang == "ko":
+        summary = f"""
+프롬프트 "{result.original_prompt}"를 분석했습니다.
+
+📊 현재 점수:
+- 구조: {result.scores['structure']}/10
+- 맥락: {result.scores['context']}/10
+
+❌ 주요 문제:
+{_format_problems(result.problems, lang)}
+
+💡 개선 제안:
+{_format_suggestions(result.suggestions, lang)}
+
+📈 예상 효과:
+{_format_impact(result.expected_impact, lang)}
+"""
+    else:
+        summary = f"""
+Analyzed prompt "{result.original_prompt}".
+
+📊 Current scores:
+- Structure: {result.scores['structure']}/10
+- Context: {result.scores['context']}/10
+
+❌ Issues:
+{_format_problems(result.problems, lang)}
+
+💡 Suggestions:
+{_format_suggestions(result.suggestions, lang)}
+
+📈 Expected impact:
+{_format_impact(result.expected_impact, lang)}
+"""
+
+    if result.extension_suggestion:
+        ext = result.extension_suggestion
+        if lang == "ko":
+            summary += f"""
+
+✨ {ext['extension']} 제안:
+`{ext['command']}` 명령어를 사용하면 더 효율적입니다.
+이유: {ext['reason']}
+
+예시: {ext['usage_example']}
+"""
+        else:
+            summary += f"""
+
+✨ {ext['extension']} suggestion:
+Consider using `{ext['command']}`.
+Reason: {ext['reason']}
+
+Example: {ext['usage_example']}
+"""
+
+    return summary.strip()
+
+
+def _format_problems(problems, lang: str) -> str:
+    if not problems:
+        return "- 없음" if lang == "ko" else "- None"
+
+    lines = []
+    for problem in problems:
+        description = problem.get("description", "")
+        impact = problem.get("impact", "")
+        if lang == "ko":
+            lines.append(f"- {description} (영향: {impact})")
+        else:
+            lines.append(f"- {description} (impact: {impact})")
+    return "\n".join(lines)
+
+
+def _format_suggestions(suggestions, lang: str) -> str:
+    if not suggestions:
+        return "- 없음" if lang == "ko" else "- None"
+
+    lines = []
+    for idx, suggestion in enumerate(suggestions, 1):
+        title = suggestion.get("title", "")
+        template = suggestion.get("template", "")
+        if lang == "ko":
+            lines.append(f"{idx}. {title}: {template}")
+        else:
+            lines.append(f"{idx}. {title}: {template}")
+    return "\n".join(lines)
+
+
+def _format_impact(impact, lang: str) -> str:
+    if not impact:
+        return "- 없음" if lang == "ko" else "- None"
+
+    messages = impact.get("messages", {})
+    code_generation = impact.get("code_generation", {})
+    success_rate = impact.get("success_rate", {})
+
+    if lang == "ko":
+        return (
+            f"- 메시지 수: {messages.get('improvement', 'N/A')}\n"
+            f"- 코드 생성: {code_generation.get('improvement', 'N/A')}\n"
+            f"- 성공률: {success_rate.get('improvement', 'N/A')}"
+        )
+
+    return (
+        f"- Messages: {messages.get('improvement', 'N/A')}\n"
+        f"- Code generation: {code_generation.get('improvement', 'N/A')}\n"
+        f"- Success rate: {success_rate.get('improvement', 'N/A')}"
+    )
 
 
 def main():
