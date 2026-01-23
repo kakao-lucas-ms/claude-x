@@ -1032,6 +1032,84 @@ def prompts(
 
 
 @app.command()
+def coach(
+    prompt: str = typer.Argument(..., help="Prompt to analyze"),
+    json_output: bool = typer.Option(False, "--json", help="Output as JSON"),
+    no_extensions: bool = typer.Option(False, "--no-ext", help="Disable extension detection"),
+    no_history: bool = typer.Option(False, "--no-history", help="Disable user history"),
+):
+    """
+    Analyze a prompt and receive improvement suggestions.
+
+    Examples:
+        cx coach "응 진행해줘"
+        cx coach "fix this bug" --json
+        cx coach "implement feature" --no-ext
+    """
+    from claude_x.mcp_server import analyze_and_improve_prompt
+    from claude_x.i18n import t
+    from rich.panel import Panel
+
+    result = analyze_and_improve_prompt(
+        prompt=prompt,
+        detect_extensions=not no_extensions,
+        include_history=not no_history,
+    )
+
+    if json_output:
+        print(json.dumps(result, ensure_ascii=False, indent=2))
+        return
+
+    lang = result["language"]
+
+    title = t("analysis.title", lang)
+    console.print(Panel(title, style="bold blue"))
+
+    console.print("\n" + t("analysis.scores", lang))
+    console.print(t("scores.value", lang, label=t("analysis.structure", lang), score=result["scores"]["structure"]))
+    console.print(t("scores.value", lang, label=t("analysis.context", lang), score=result["scores"]["context"]))
+
+    if result["problems"]:
+        console.print("\n" + t("analysis.problems", lang))
+        for idx, problem in enumerate(result["problems"], 1):
+            console.print(f"{idx}. {problem['description']}")
+            if problem.get("impact"):
+                console.print(f"   {problem['impact']}", style="dim")
+
+    if result["suggestions"]:
+        console.print("\n" + t("analysis.suggestions", lang))
+        for idx, suggestion in enumerate(result["suggestions"], 1):
+            console.print(f"\n[bold]{idx}. {suggestion['title']}[/bold]")
+            console.print(Panel(suggestion["template"], border_style="green"))
+            if suggestion.get("why_successful"):
+                console.print(f"   {suggestion['why_successful']}", style="dim")
+
+    if result.get("extension_suggestion"):
+        ext = result["extension_suggestion"]
+        console.print("\n" + t("analysis.extension_suggestion", lang))
+        console.print(f"[bold cyan]{ext['command']}[/bold cyan]")
+        console.print(t("extensions.reason", lang, reason=ext["reason"]))
+
+    if result.get("expected_impact"):
+        impact = result["expected_impact"]
+        console.print("\n" + t("analysis.expected_impact", lang))
+        if lang == "ko":
+            console.print(f"- 메시지 수: {impact['messages']['improvement']}")
+            console.print(f"- 코드 생성: {impact['code_generation']['improvement']}")
+            console.print(f"- 성공률: {impact['success_rate']['improvement']}")
+        else:
+            console.print(f"- Messages: {impact['messages']['improvement']}")
+            console.print(f"- Code generation: {impact['code_generation']['improvement']}")
+            console.print(f"- Success rate: {impact['success_rate']['improvement']}")
+
+
+@app.command(hidden=True)
+def cx(prompt: str = typer.Argument(...)):
+    """Alias for 'coach' command."""
+    coach(prompt)
+
+
+@app.command()
 def templates(
     category: Optional[str] = typer.Option(None, "--category", "-c", help="Filter by category"),
     search: Optional[str] = typer.Option(None, "--search", "-s", help="Search templates"),
