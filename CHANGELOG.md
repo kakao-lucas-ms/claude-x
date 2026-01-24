@@ -2,6 +2,22 @@
 
 All notable changes to Claude-X will be documented in this file.
 
+## [0.5.1] - 2026-01-24
+
+### 🐛 Fixed
+
+#### cx watch 실시간 감지 문제 해결
+- `sessions-index.json`의 오래된 mtime 대신 **실제 파일 mtime** 사용
+- 채팅할 때마다 새 메시지가 즉시 import되도록 수정
+
+### ✨ Improved
+
+#### cx watch UI 개선
+- 시작 시 현재 DB 상태 표시 (세션 수, 마지막 세션 시간)
+- 타임스탬프와 함께 import 결과 표시
+- 불필요한 "No new data" 메시지 제거
+- fallback 폴링 간격 60초로 조정
+
 ## [0.5.0] - 2026-01-24
 
 ### ✨ Added

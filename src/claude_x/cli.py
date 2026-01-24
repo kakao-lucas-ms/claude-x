@@ -86,6 +86,10 @@ def _import_sessions(
             existing_offset = existing["last_read_offset"] if existing else 0
             existing_mtime = existing["file_mtime"] if existing else 0
 
+            # Get actual file mtime for accurate incremental import
+            session_file = Path(session_entry.full_path)
+            actual_mtime = int(session_file.stat().st_mtime * 1000) if session_file.exists() else session_entry.file_mtime
+
             session_model = Session(
                 session_id=session_entry.session_id,
                 project_id=project_id,
@@ -94,7 +98,7 @@ def _import_sessions(
                 message_count=session_entry.message_count,
                 git_branch=session_entry.git_branch,
                 is_sidechain=session_entry.is_sidechain,
-                file_mtime=session_entry.file_mtime,
+                file_mtime=actual_mtime,  # Use actual file mtime, not stale index mtime
                 last_read_offset=existing_offset,
                 created_at=datetime.fromisoformat(session_entry.created.replace("Z", "+00:00")),
                 modified_at=datetime.fromisoformat(session_entry.modified.replace("Z", "+00:00"))
@@ -102,16 +106,15 @@ def _import_sessions(
             storage.insert_session(session_model)
             counts["sessions"] += 1
 
-            # Parse messages
-            session_path = Path(session_entry.full_path)
-            if not session_path.exists():
+            # Parse messages - skip if file unchanged (using actual mtime, not stale index)
+            if not session_file.exists():
                 continue
 
-            if incremental and existing and session_entry.file_mtime and session_entry.file_mtime <= existing_mtime:
+            if incremental and existing and actual_mtime <= existing_mtime:
                 continue
 
             start_offset = existing_offset if incremental else 0
-            parser = SessionParser(session_path)
+            parser = SessionParser(session_file)
             for message in parser.parse_messages(session_entry.session_id, offset=start_offset):
                 message_id = storage.insert_message(message)
                 if not message_id:
@@ -541,8 +544,12 @@ def watch(
                 incremental=True,
             )
             if counts["messages"] or counts["snippets"]:
+                from datetime import datetime
+                now = datetime.now().strftime("%H:%M:%S")
                 console.print(
-                    f"✅ Imported {counts['sessions']} sessions, {counts['messages']} messages, {counts['snippets']} snippets"
+                    f"[green]✅ [{now}][/green] "
+                    f"Imported [bold]{counts['messages']}[/bold] messages, "
+                    f"[bold]{counts['snippets']}[/bold] code snippets"
                 )
         finally:
             import_in_progress = False
@@ -560,7 +567,7 @@ def watch(
                 return
             now = time.time()
             if now - self.last_run < self.debounce_seconds:
-                return
+                return  # Skip if within debounce window
             self.last_run = now
             run_import()
 
@@ -569,12 +576,38 @@ def watch(
     observer.schedule(handler, str(projects_dir), recursive=True)
     observer.start()
 
-    console.print("👀 Watching Claude Code sessions (Ctrl+C to stop)...")
+    # Show initial status
+    sessions = list(storage.list_sessions(limit=1))
+    total_sessions = len(list(storage.list_sessions(limit=10000)))
+    console.print()
+    console.print("[bold cyan]╭─────────────────────────────────────╮[/bold cyan]")
+    console.print("[bold cyan]│[/bold cyan]  👀 Claude-X Watch Mode            [bold cyan]│[/bold cyan]")
+    console.print("[bold cyan]╰─────────────────────────────────────╯[/bold cyan]")
+    console.print()
+    console.print(f"📁 Monitoring: [dim]{projects_dir}[/dim]")
+    console.print(f"📊 Sessions in DB: [green]{total_sessions}[/green]")
+    if sessions:
+        last = sessions[0]
+        console.print(f"🕐 Last session: [dim]{last.get('created_at', 'N/A')}[/dim]")
+    console.print()
+    console.print("[dim]Waiting for Claude Code activity...[/dim]")
+    console.print("[dim]Press Ctrl+C to stop[/dim]")
+    console.print()
+
+    # Initial import
+    run_import()
+
     try:
+        poll_count = 0
         while True:
             time.sleep(1)
+            poll_count += 1
+            # Fallback: check every 60 seconds in case watchdog misses events
+            if poll_count >= 60:
+                poll_count = 0
+                run_import()
     except KeyboardInterrupt:
-        console.print("\nStopped watching.")
+        console.print("\n[yellow]👋 Stopped watching.[/yellow]")
         observer.stop()
     observer.join()
 
