@@ -2,6 +2,40 @@
 
 All notable changes to Claude-X will be documented in this file.
 
+## [0.5.0] - 2026-01-24
+
+### ✨ Added
+
+#### Scenario B: Auto-Execute Hints
+- Claude가 분석 후 **자동으로 권장 액션 실행**하도록 유도하는 힌트 시스템
+- `auto_execute` 필드: enabled, reason, actions (with priority), fallback
+- 안전한 인텐트(find, explain)에서 자동 실행 활성화
+
+#### Interactive Mode: Missing Info Detection
+- 프롬프트에서 **누락된 필수 정보 감지** 및 질문 생성
+- `missing_info` 필드: type, question, example, required
+- Intent별 필수 정보 정의 (fix: error_message, file_path 등)
+
+#### Smart Rewrite: Project Context
+- **실제 프로젝트 파일 경로**를 활용한 프롬프트 재작성
+- `smart_prompt` 필드: `@실제/파일/경로.md 여기서 작업`
+- 새 모듈 `context.py`: `get_project_context()`, `find_matching_files()`, `summarize_task()`
+
+#### Export & Share
+- 베스트 프롬프트를 **HTML, JSON, Gist**로 내보내기
+- 새 모듈 `export.py`: `export_to_html()`, `export_to_json()`, `export_to_gist()`
+- CLI 명령어: `cx export --format html|json|gist`
+
+### 🔧 Changed
+
+- `PromptCoach.analyze()`: v0.5.0 필드 (auto_execute, missing_info, smart_prompt) 반환
+- `mcp_server.py`: `llm_summary`에 자동 실행 힌트, 누락 정보, 스마트 프롬프트 섹션 추가
+- 헬퍼 함수 순서 정리 (`_has_file_path`, `_has_error_message` 등 상단 이동)
+
+### 📚 Documentation
+
+- `docs/ROADMAP_v0.5.0.md`: v0.5.0 구현 로드맵 문서
+
 ## [0.4.0] - 2026-01-30
 
 ### ✨ Added

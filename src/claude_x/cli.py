@@ -21,6 +21,7 @@ from .storage import Storage
 from .models import Project, Session, Message
 from .analytics import PromptAnalytics
 from .prompt_templates import PromptTemplateLibrary
+from .export import export_to_html, export_to_gist, export_to_json
 
 app = typer.Typer(
     name="cx",
@@ -1309,6 +1310,84 @@ def templates(
 
     console.print(f"\n[dim]💡 Tip: Use --show <name> to see full template[/dim]")
     console.print(f"[dim]💡 Tip: Use --export to save all templates as markdown[/dim]")
+
+
+@app.command("export")
+def export_prompts(
+    format: str = typer.Option("html", "--format", "-f", help="Output format: html, json, gist"),
+    output: Optional[str] = typer.Option(None, "--output", "-o", help="Output file path"),
+    project: Optional[str] = typer.Option(None, "--project", "-p", help="Filter by project"),
+    limit: int = typer.Option(20, "--limit", "-l", help="Max prompts to export"),
+    public: bool = typer.Option(False, "--public", help="Make gist public (gist format only)"),
+    strict: bool = typer.Option(False, "--strict", help="Strict quality filtering"),
+    min_quality: Optional[float] = typer.Option(None, "--min-quality", help="Minimum quality score"),
+):
+    """Export best prompts to HTML, JSON, or GitHub Gist.
+
+    Examples:
+        cx export --format html --output best-prompts.html
+        cx export --format json --output prompts.json
+        cx export --format gist --public
+    """
+    storage = get_storage()
+    analytics = PromptAnalytics(storage)
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task("Fetching best prompts...", total=None)
+
+        prompts = analytics.get_best_prompts(
+            project_name=project,
+            limit=limit,
+            strict_mode=strict,
+            min_quality=min_quality,
+        )
+
+        progress.update(task, description=f"Found {len(prompts)} prompts")
+
+    if not prompts:
+        console.print("[yellow]No prompts found to export.[/yellow]")
+        console.print("[dim]Try: cx import to import session data first.[/dim]")
+        return
+
+    if format == "html":
+        if not output:
+            output = str(Path.home() / ".claude-x" / "best-prompts.html")
+
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        result = export_to_html(prompts, output)
+        console.print(f"[green]✅ Exported to HTML: {result}[/green]")
+        console.print(f"[dim]Open in browser: file://{result}[/dim]")
+
+    elif format == "json":
+        if not output:
+            output = str(Path.home() / ".claude-x" / "best-prompts.json")
+
+        Path(output).parent.mkdir(parents=True, exist_ok=True)
+        result = export_to_json(prompts, output)
+        console.print(f"[green]✅ Exported to JSON: {result}[/green]")
+
+    elif format == "gist":
+        console.print("[dim]Creating GitHub Gist...[/dim]")
+        result = export_to_gist(prompts, public=public)
+
+        if result.get("success"):
+            console.print(f"[green]✅ Gist created successfully![/green]")
+            console.print(f"[bold]URL: {result['url']}[/bold]")
+            if public:
+                console.print("[dim]This is a public gist - anyone with the link can view it.[/dim]")
+            else:
+                console.print("[dim]This is a secret gist - only you can find it.[/dim]")
+        else:
+            console.print(f"[red]❌ Failed to create gist: {result.get('error')}[/red]")
+            console.print("[dim]Make sure gh CLI is installed and authenticated: gh auth login[/dim]")
+
+    else:
+        console.print(f"[red]Unknown format: {format}[/red]")
+        console.print("[dim]Supported formats: html, json, gist[/dim]")
 
 
 def main():

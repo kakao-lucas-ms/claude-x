@@ -383,6 +383,88 @@ Analyzed prompt "{result.original_prompt}".
 {_format_impact(result.expected_impact, lang)}
 """
 
+    # v0.4.1: Add improved prompt and recommended actions
+    if hasattr(result, 'intent') and result.intent != "unknown":
+        if lang == "ko":
+            summary += f"""
+
+🎯 감지된 의도: {result.intent}
+
+✨ 개선된 프롬프트:
+{result.improved_prompt}
+"""
+        else:
+            summary += f"""
+
+🎯 Detected intent: {result.intent}
+
+✨ Improved prompt:
+{result.improved_prompt}
+"""
+
+    if hasattr(result, 'recommended_actions') and result.recommended_actions:
+        if lang == "ko":
+            summary += "\n🔧 권장 액션:\n"
+            for action in result.recommended_actions:
+                summary += f"- {action['tool']}: {action['reason']}\n"
+        else:
+            summary += "\n🔧 Recommended actions:\n"
+            for action in result.recommended_actions:
+                summary += f"- {action['tool']}: {action['reason']}\n"
+
+    # v0.5.0: Add auto-execute hints and smart prompt
+    if hasattr(result, 'smart_prompt') and result.smart_prompt:
+        if lang == "ko":
+            summary += f"""
+🚀 스마트 프롬프트 (실제 파일 경로 포함):
+{result.smart_prompt}
+"""
+        else:
+            summary += f"""
+🚀 Smart prompt (with actual file paths):
+{result.smart_prompt}
+"""
+
+    if hasattr(result, 'auto_execute') and result.auto_execute:
+        auto = result.auto_execute
+        if auto.get("enabled"):
+            if lang == "ko":
+                summary += f"""
+🤖 자동 실행 권장:
+{auto.get('reason', '')}
+
+권장 순서:
+"""
+                for action in auto.get("actions", []):
+                    summary += f"{action['priority']}. {action['tool']}: {action.get('description', '')}\n"
+                summary += f"\n⚠️ 실패 시: {auto.get('fallback', '')}\n"
+            else:
+                summary += f"""
+🤖 Auto-execute recommended:
+{auto.get('reason', '')}
+
+Recommended order:
+"""
+                for action in auto.get("actions", []):
+                    summary += f"{action['priority']}. {action['tool']}: {action.get('description', '')}\n"
+                summary += f"\n⚠️ Fallback: {auto.get('fallback', '')}\n"
+
+    if hasattr(result, 'missing_info') and result.missing_info:
+        if lang == "ko":
+            summary += "\n❓ 추가 정보 필요:\n"
+            for info in result.missing_info:
+                required = " (필수)" if info.get("required") else ""
+                summary += f"- {info['question']}{required}\n"
+                if info.get("example"):
+                    summary += f"  예: {info['example']}\n"
+        else:
+            summary += "\n❓ Additional information needed:\n"
+            for info in result.missing_info:
+                required = " (required)" if info.get("required") else ""
+                summary += f"- {info['question']}{required}\n"
+                if info.get("example"):
+                    summary += f"  Example: {info['example']}\n"
+
     if result.extension_suggestion:
         ext = result.extension_suggestion
         if lang == "ko":
