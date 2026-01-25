@@ -456,6 +456,8 @@ class CoachingResult:
     auto_execute: "PromptDict | None" = None
     missing_info: list["PromptDict"] = field(default_factory=list)
     smart_prompt: str = ""  # Project-context-aware rewrite
+    # v0.5.1: Similar prompt suggestions for interactive selection
+    suggested_prompts: list["PromptDict"] = field(default_factory=list)
 
 
 PromptDict = dict[str, Any]
@@ -511,6 +513,9 @@ class PromptCoach:
         missing_info = detect_missing_info(prompt, intent, lang)
         smart_prompt = smart_rewrite(prompt, intent, lang)
 
+        # v0.5.1: Find similar successful prompts for interactive selection
+        suggested_prompts = self._get_similar_prompts(prompt, intent)
+
         return CoachingResult(
             language=lang,
             original_prompt=prompt,
@@ -526,6 +531,7 @@ class PromptCoach:
             auto_execute=auto_execute,
             missing_info=missing_info,
             smart_prompt=smart_prompt,
+            suggested_prompts=suggested_prompts,
         )
 
     def identify_problems(self, prompt: str, scores: ScoreMap, lang: str) -> list[PromptDict]:
@@ -691,6 +697,49 @@ class PromptCoach:
     def _get_user_best_prompts(self) -> list[PromptDict]:
         try:
             return self.analytics.get_best_prompts(limit=5, strict_mode=True)
+        except Exception:
+            return []
+
+    def _get_similar_prompts(self, prompt: str, intent: str) -> list[PromptDict]:
+        """Get similar successful prompts for interactive selection.
+
+        Args:
+            prompt: Current user prompt
+            intent: Detected intent
+
+        Returns:
+            List of similar prompts with selection-friendly format
+        """
+        try:
+            similar = self.analytics.find_similar_prompts(
+                prompt=prompt,
+                intent=intent,
+                limit=3,
+                min_similarity=0.15
+            )
+
+            # Transform to selection-friendly format
+            options = []
+            for i, p in enumerate(similar):
+                # Truncate long prompts for display
+                display_prompt = p["prompt"]
+                if len(display_prompt) > 100:
+                    display_prompt = display_prompt[:97] + "..."
+
+                options.append({
+                    "index": i + 1,
+                    "prompt": p["prompt"],
+                    "display": display_prompt,
+                    "similarity": p["similarity"],
+                    "success_rate": p["success_rate"],
+                    "reason": p["reason"],
+                    "stats": {
+                        "messages": p["message_count"],
+                        "code": p["code_count"],
+                    }
+                })
+
+            return options
         except Exception:
             return []
 

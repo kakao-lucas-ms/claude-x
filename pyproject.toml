@@ -1,6 +1,6 @@
 [project]
 name = "claude-x"
-version = "0.5.1"
+version = "0.6.0"
 description = "Second Brain and Command Center for Claude Code"
 readme = "README.md"
 license = { text = "MIT" }
@@ -15,6 +15,7 @@ dependencies = [
     "watchdog>=6.0.0",
     "pydantic>=2.12.5",
     "mcp>=1.0.0",
+    "pyyaml>=6.0",
 ]
 keywords = [
     "claude",
@@ -55,3 +56,17 @@ cx-mcp = "claude_x.mcp_server:main"
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/claude_x"]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+]
+
+[tool.hatch.build]
+include = [
+    "src/claude_x/**/*.yaml",
+    "src/claude_x/**/*.yml",
+]

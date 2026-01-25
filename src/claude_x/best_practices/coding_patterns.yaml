@@ -1,0 +1,249 @@
+version: "1.0"
+category: "implementation"
+templates:
+  - id: "impl-001"
+    name: "Feature Implementation with Context"
+    name_ko: "컨텍스트 포함 기능 구현"
+    pattern_type: "target_action"
+    intent: "create"
+    triggers:
+      - "기능"
+      - "구현"
+      - "만들어"
+      - "추가"
+      - "implement"
+      - "create"
+      - "add"
+      - "feature"
+    template:
+      ko: |
+        @[FILE_PATH]에 [FEATURE_NAME] 기능을 구현해줘.
+
+        ## 요구사항
+        - [REQUIREMENT_1]
+        - [REQUIREMENT_2]
+
+        ## 제약사항
+        - [CONSTRAINT]
+
+        ## 참고
+        - 기존 [REFERENCE_CODE] 패턴 참고
+      en: |
+        Implement [FEATURE_NAME] in @[FILE_PATH].
+
+        ## Requirements
+        - [REQUIREMENT_1]
+        - [REQUIREMENT_2]
+
+        ## Constraints
+        - [CONSTRAINT]
+
+        ## Reference
+        - Follow existing [REFERENCE_CODE] pattern
+    placeholders:
+      - name: "FILE_PATH"
+        description: "Target file path"
+        description_ko: "대상 파일 경로"
+        required: true
+        example: "src/components/UserProfile.tsx"
+      - name: "FEATURE_NAME"
+        description: "Name of the feature"
+        description_ko: "기능 이름"
+        required: true
+        example: "dark mode toggle"
+      - name: "REQUIREMENT_1"
+        description: "First requirement"
+        description_ko: "첫 번째 요구사항"
+        required: false
+        example: "Toggle should persist across sessions"
+      - name: "REQUIREMENT_2"
+        description: "Second requirement"
+        description_ko: "두 번째 요구사항"
+        required: false
+        example: "Should sync with system preference"
+      - name: "CONSTRAINT"
+        description: "Any constraints"
+        description_ko: "제약사항"
+        required: false
+        example: "No external dependencies"
+      - name: "REFERENCE_CODE"
+        description: "Reference code or pattern"
+        description_ko: "참고할 코드나 패턴"
+        required: false
+        example: "@src/components/ThemeProvider.tsx"
+    quality_boost: 3.5
+    tags:
+      - "feature"
+      - "implementation"
+      - "create"
+
+  - id: "impl-002"
+    name: "API Endpoint Implementation"
+    name_ko: "API 엔드포인트 구현"
+    pattern_type: "target_action"
+    intent: "create"
+    triggers:
+      - "api"
+      - "endpoint"
+      - "엔드포인트"
+      - "rest"
+      - "route"
+    template:
+      ko: |
+        [HTTP_METHOD] [ENDPOINT_PATH] API 엔드포인트를 구현해줘.
+
+        ## 기능
+        [FUNCTIONALITY]
+
+        ## Request
+        - Method: [HTTP_METHOD]
+        - Path: [ENDPOINT_PATH]
+        - Body: [REQUEST_BODY]
+
+        ## Response
+        - Success: [SUCCESS_RESPONSE]
+        - Error: [ERROR_RESPONSE]
+
+        ## 참고
+        - 기존 @[REFERENCE_API] 패턴 참고
+      en: |
+        Implement [HTTP_METHOD] [ENDPOINT_PATH] API endpoint.
+
+        ## Functionality
+        [FUNCTIONALITY]
+
+        ## Request
+        - Method: [HTTP_METHOD]
+        - Path: [ENDPOINT_PATH]
+        - Body: [REQUEST_BODY]
+
+        ## Response
+        - Success: [SUCCESS_RESPONSE]
+        - Error: [ERROR_RESPONSE]
+
+        ## Reference
+        - Follow @[REFERENCE_API] pattern
+    placeholders:
+      - name: "HTTP_METHOD"
+        description: "HTTP method"
+        description_ko: "HTTP 메서드"
+        required: true
+        example: "POST"
+      - name: "ENDPOINT_PATH"
+        description: "API endpoint path"
+        description_ko: "API 엔드포인트 경로"
+        required: true
+        example: "/api/users/:id/profile"
+      - name: "FUNCTIONALITY"
+        description: "What the endpoint does"
+        description_ko: "엔드포인트 기능"
+        required: true
+        example: "Update user profile information"
+      - name: "REQUEST_BODY"
+        description: "Expected request body"
+        description_ko: "요청 바디"
+        required: false
+        example: "{ name: string, email: string }"
+      - name: "SUCCESS_RESPONSE"
+        description: "Success response format"
+        description_ko: "성공 응답 형식"
+        required: false
+        example: "200 OK with updated user object"
+      - name: "ERROR_RESPONSE"
+        description: "Error response format"
+        description_ko: "에러 응답 형식"
+        required: false
+        example: "400 Bad Request, 404 Not Found"
+      - name: "REFERENCE_API"
+        description: "Reference API file"
+        description_ko: "참고할 API 파일"
+        required: false
+        example: "src/api/auth.ts"
+    quality_boost: 4.0
+    tags:
+      - "api"
+      - "backend"
+      - "implementation"
+
+  - id: "impl-003"
+    name: "React Component Creation"
+    name_ko: "React 컴포넌트 생성"
+    pattern_type: "target_action"
+    intent: "create"
+    triggers:
+      - "컴포넌트"
+      - "component"
+      - "react"
+      - "리액트"
+    template:
+      ko: |
+        @[FILE_PATH]에 [COMPONENT_NAME] 컴포넌트를 만들어줘.
+
+        ## Props
+        [PROPS_DEFINITION]
+
+        ## 기능
+        - [FEATURE_1]
+        - [FEATURE_2]
+
+        ## 스타일
+        - [STYLE_REQUIREMENTS]
+
+        ## 참고
+        - @[REFERENCE_COMPONENT] 스타일 참고
+      en: |
+        Create [COMPONENT_NAME] component at @[FILE_PATH].
+
+        ## Props
+        [PROPS_DEFINITION]
+
+        ## Features
+        - [FEATURE_1]
+        - [FEATURE_2]
+
+        ## Styling
+        - [STYLE_REQUIREMENTS]
+
+        ## Reference
+        - Follow @[REFERENCE_COMPONENT] style
+    placeholders:
+      - name: "FILE_PATH"
+        description: "File path for the component"
+        description_ko: "컴포넌트 파일 경로"
+        required: true
+        example: "src/components/Button.tsx"
+      - name: "COMPONENT_NAME"
+        description: "Name of the component"
+        description_ko: "컴포넌트 이름"
+        required: true
+        example: "ActionButton"
+      - name: "PROPS_DEFINITION"
+        description: "Component props"
+        description_ko: "컴포넌트 props"
+        required: false
+        example: "{ label: string, onClick: () => void, disabled?: boolean }"
+      - name: "FEATURE_1"
+        description: "First feature"
+        description_ko: "첫 번째 기능"
+        required: false
+        example: "Loading state with spinner"
+      - name: "FEATURE_2"
+        description: "Second feature"
+        description_ko: "두 번째 기능"
+        required: false
+        example: "Disabled state styling"
+      - name: "STYLE_REQUIREMENTS"
+        description: "Styling requirements"
+        description_ko: "스타일 요구사항"
+        required: false
+        example: "Use Tailwind CSS classes"
+      - name: "REFERENCE_COMPONENT"
+        description: "Reference component"
+        description_ko: "참고 컴포넌트"
+        required: false
+        example: "src/components/BaseButton.tsx"
+    quality_boost: 3.5
+    tags:
+      - "react"
+      - "component"
+      - "frontend"

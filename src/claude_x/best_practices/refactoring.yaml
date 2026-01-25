@@ -1,0 +1,152 @@
+version: "1.0"
+category: "refactoring"
+templates:
+  - id: "refactor-001"
+    name: "Code Refactoring with Goals"
+    name_ko: "목표 포함 코드 리팩토링"
+    pattern_type: "context_goal"
+    intent: "refactor"
+    triggers:
+      - "리팩토링"
+      - "refactor"
+      - "개선"
+      - "정리"
+      - "improve"
+      - "clean"
+    template:
+      ko: |
+        @[FILE_PATH]를 리팩토링해줘.
+
+        ## 현재 문제점
+        - [CURRENT_ISSUE_1]
+        - [CURRENT_ISSUE_2]
+
+        ## 목표
+        - [GOAL_1]
+        - [GOAL_2]
+
+        ## 제약사항
+        - [CONSTRAINT]
+
+        ## 참고
+        - 기존 동작은 유지하면서 코드 품질만 개선
+      en: |
+        Refactor @[FILE_PATH].
+
+        ## Current Issues
+        - [CURRENT_ISSUE_1]
+        - [CURRENT_ISSUE_2]
+
+        ## Goals
+        - [GOAL_1]
+        - [GOAL_2]
+
+        ## Constraints
+        - [CONSTRAINT]
+
+        ## Note
+        - Maintain existing behavior while improving code quality
+    placeholders:
+      - name: "FILE_PATH"
+        description: "File to refactor"
+        description_ko: "리팩토링할 파일"
+        required: true
+        example: "src/utils/helpers.ts"
+      - name: "CURRENT_ISSUE_1"
+        description: "First issue with current code"
+        description_ko: "현재 코드의 첫 번째 문제점"
+        required: true
+        example: "Too many nested if statements"
+      - name: "CURRENT_ISSUE_2"
+        description: "Second issue with current code"
+        description_ko: "현재 코드의 두 번째 문제점"
+        required: false
+        example: "Duplicate code across functions"
+      - name: "GOAL_1"
+        description: "First refactoring goal"
+        description_ko: "첫 번째 리팩토링 목표"
+        required: true
+        example: "Simplify control flow"
+      - name: "GOAL_2"
+        description: "Second refactoring goal"
+        description_ko: "두 번째 리팩토링 목표"
+        required: false
+        example: "Extract common logic into helper functions"
+      - name: "CONSTRAINT"
+        description: "Any constraints"
+        description_ko: "제약사항"
+        required: false
+        example: "Keep public API unchanged"
+    quality_boost: 3.0
+    tags:
+      - "refactoring"
+      - "clean-code"
+
+  - id: "refactor-002"
+    name: "Extract Function/Module"
+    name_ko: "함수/모듈 추출"
+    pattern_type: "target_action"
+    intent: "refactor"
+    triggers:
+      - "추출"
+      - "extract"
+      - "분리"
+      - "separate"
+    template:
+      ko: |
+        @[SOURCE_FILE]에서 [TARGET_CODE]를 @[TARGET_FILE]로 추출해줘.
+
+        ## 추출할 부분
+        [CODE_TO_EXTRACT]
+
+        ## 이유
+        [REASON]
+
+        ## 고려사항
+        - Import 구조 정리
+        - 기존 호출부 업데이트
+        - 타입 정의 이동
+      en: |
+        Extract [TARGET_CODE] from @[SOURCE_FILE] to @[TARGET_FILE].
+
+        ## Code to Extract
+        [CODE_TO_EXTRACT]
+
+        ## Reason
+        [REASON]
+
+        ## Considerations
+        - Clean up import structure
+        - Update existing call sites
+        - Move type definitions
+    placeholders:
+      - name: "SOURCE_FILE"
+        description: "Source file"
+        description_ko: "원본 파일"
+        required: true
+        example: "src/pages/Dashboard.tsx"
+      - name: "TARGET_FILE"
+        description: "Target file for extracted code"
+        description_ko: "추출된 코드를 넣을 파일"
+        required: true
+        example: "src/components/DashboardWidget.tsx"
+      - name: "TARGET_CODE"
+        description: "What to extract"
+        description_ko: "추출할 대상"
+        required: true
+        example: "widget rendering logic"
+      - name: "CODE_TO_EXTRACT"
+        description: "Specific code or function names"
+        description_ko: "추출할 코드나 함수명"
+        required: false
+        example: "renderWidget function and related state"
+      - name: "REASON"
+        description: "Reason for extraction"
+        description_ko: "추출 이유"
+        required: false
+        example: "Improve reusability and testability"
+    quality_boost: 3.0
+    tags:
+      - "refactoring"
+      - "extract"
+      - "modularization"

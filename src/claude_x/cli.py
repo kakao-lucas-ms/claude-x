@@ -22,6 +22,13 @@ from .models import Project, Session, Message
 from .analytics import PromptAnalytics
 from .prompt_templates import PromptTemplateLibrary
 from .export import export_to_html, export_to_gist, export_to_json
+from .template_registry import (
+    list_available_packs,
+    list_installed_packs,
+    install_pack,
+    uninstall_pack,
+    is_pack_installed,
+)
 
 app = typer.Typer(
     name="cx",
@@ -1421,6 +1428,173 @@ def export_prompts(
     else:
         console.print(f"[red]Unknown format: {format}[/red]")
         console.print("[dim]Supported formats: html, json, gist[/dim]")
+
+
+# ============================================================================
+# Template Pack Management Commands
+# ============================================================================
+
+packs_app = typer.Typer(help="Manage external template packs")
+app.add_typer(packs_app, name="packs")
+
+
+@packs_app.command("list")
+def packs_list_cmd():
+    """List all available template packs."""
+    packs = list_available_packs()
+
+    console.print("\n[bold cyan]📦 Available Template Packs[/bold cyan]\n")
+
+    table = Table()
+    table.add_column("ID", style="cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Status", style="yellow")
+    table.add_column("License")
+    table.add_column("Templates", justify="right")
+
+    for pack in packs:
+        status = "✅ Bundled" if pack.bundled else (
+            "✅ Installed" if is_pack_installed(pack.id) else "⬜ Available"
+        )
+        table.add_row(
+            pack.id,
+            pack.name,
+            status,
+            pack.license,
+            str(pack.template_count),
+        )
+
+    console.print(table)
+    console.print()
+    console.print("[dim]💡 Install a pack: cx packs install <pack-id>[/dim]")
+    console.print("[dim]💡 View installed: cx packs installed[/dim]")
+
+
+@packs_app.command("installed")
+def packs_installed_cmd():
+    """Show installed template packs."""
+    installed = list_installed_packs()
+
+    if not installed:
+        console.print("[yellow]No template packs installed.[/yellow]")
+        console.print("[dim]Use 'cx packs list' to see available packs.[/dim]")
+        return
+
+    console.print("\n[bold cyan]📦 Installed Template Packs[/bold cyan]\n")
+
+    table = Table()
+    table.add_column("ID", style="cyan")
+    table.add_column("Name", style="green")
+    table.add_column("Installed At")
+    table.add_column("Location", style="dim")
+
+    for item in installed:
+        pack = item["pack"]
+        table.add_row(
+            pack.id,
+            pack.name,
+            item["installed_at"][:10] if item["installed_at"] != "bundled" else "bundled",
+            item["path"][:50] + "..." if len(item["path"]) > 50 else item["path"],
+        )
+
+    console.print(table)
+
+
+@packs_app.command("install")
+def packs_install_cmd(
+    pack_id: str = typer.Argument(..., help="Pack ID to install"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force reinstall if already installed"),
+):
+    """Install a template pack from the registry."""
+    console.print(f"[dim]Installing template pack: {pack_id}...[/dim]")
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console
+    ) as progress:
+        task = progress.add_task(f"Installing {pack_id}...", total=None)
+
+        result = install_pack(pack_id, force=force)
+
+        if result["success"]:
+            progress.update(task, description="✅ Installation complete")
+        else:
+            progress.update(task, description="❌ Installation failed")
+
+    if result["success"]:
+        if result.get("already_installed"):
+            console.print(f"[yellow]{result['message']}[/yellow]")
+        else:
+            console.print(f"[green]✅ {result['message']}[/green]")
+            if result.get("template_count"):
+                console.print(f"   Templates: {result['template_count']}")
+            if result.get("attribution"):
+                console.print(f"   [dim]Attribution: {result['attribution']}[/dim]")
+            if result.get("path"):
+                console.print(f"   [dim]Location: {result['path']}[/dim]")
+    else:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+
+
+@packs_app.command("remove")
+def packs_remove_cmd(
+    pack_id: str = typer.Argument(..., help="Pack ID to remove"),
+):
+    """Remove an installed template pack."""
+    result = uninstall_pack(pack_id)
+
+    if result["success"]:
+        console.print(f"[green]✅ {result['message']}[/green]")
+    else:
+        console.print(f"[red]❌ Error: {result['error']}[/red]")
+
+
+@packs_app.command("info")
+def packs_info_cmd(
+    pack_id: str = typer.Argument(..., help="Pack ID to show info"),
+):
+    """Show detailed information about a template pack."""
+    from .template_registry import get_registry
+
+    registry = get_registry()
+    pack = registry.get_pack(pack_id)
+
+    if not pack:
+        console.print(f"[red]Pack '{pack_id}' not found in registry.[/red]")
+        return
+
+    console.print(f"\n[bold cyan]📦 {pack.name}[/bold cyan]")
+    if pack.name_ko:
+        console.print(f"[dim]({pack.name_ko})[/dim]")
+    console.print()
+
+    console.print(f"[bold]ID:[/bold] {pack.id}")
+    console.print(f"[bold]Description:[/bold] {pack.description}")
+    if pack.description_ko:
+        console.print(f"[dim]{pack.description_ko}[/dim]")
+    console.print()
+
+    console.print(f"[bold]Source:[/bold] {pack.source}")
+    console.print(f"[bold]License:[/bold] {pack.license}")
+    console.print(f"[bold]Author:[/bold] {pack.author}")
+    if pack.attribution:
+        console.print(f"[bold]Attribution:[/bold] {pack.attribution}")
+    console.print()
+
+    console.print(f"[bold]Categories:[/bold] {', '.join(pack.categories)}")
+    console.print(f"[bold]Templates:[/bold] ~{pack.template_count}")
+    console.print()
+
+    status = "Bundled" if pack.bundled else (
+        "Installed" if is_pack_installed(pack.id) else "Not Installed"
+    )
+    status_color = "green" if pack.bundled or is_pack_installed(pack.id) else "yellow"
+    console.print(f"[bold]Status:[/bold] [{status_color}]{status}[/{status_color}]")
+
+    if not pack.bundled and not is_pack_installed(pack.id):
+        console.print()
+        console.print(f"[dim]💡 Install with: cx packs install {pack.id}[/dim]")
 
 
 def main():

@@ -2,6 +2,73 @@
 
 All notable changes to Claude-X will be documented in this file.
 
+## [0.6.0] - 2026-01-25
+
+### ✨ Added
+
+#### Best Practices Template System
+- **External Best Practices Database**: YAML-based template library for prompt enhancement
+  - 10 initial templates across 4 categories: debugging, implementation, refactoring, code review
+  - Bilingual templates (Korean/English) with automatic language detection
+  - Quality boost scoring for expected improvement estimation
+
+#### Prompt Enhancement Engine
+- **Opt-in Enhancement**: Use triggers like "고도화해서", "enhance" to activate
+  - Automatic template matching based on intent and keywords
+  - Context extraction from prompts (file paths, error messages, component names)
+  - Placeholder management with fill guidance
+
+#### New MCP Tools
+- **`enhance_prompt`**: Transform simple prompts into structured, best-practice prompts
+  - Before/after comparison with score improvements
+  - Auto-execute hints when all required fields are filled
+  - LLM-friendly summaries for Claude consumption
+- **`list_enhancement_templates`**: Browse available templates by intent/category
+
+#### Template Matching Engine (`template_matcher.py`)
+- Intent detection from prompt text (fix, create, explain, refactor, find, test)
+- Keyword-based template matching with scoring
+- Quality gap analysis between current prompt and best practices
+
+#### External Template Pack Registry
+- **Template Pack Manager**: Install additional template packs from external sources
+  - `cx packs list` - List all available template packs
+  - `cx packs install <pack>` - Install a pack from GitHub
+  - `cx packs remove <pack>` - Uninstall a pack
+  - `cx packs info <pack>` - Show pack details
+  - `cx packs installed` - View installed packs
+- **Attribution Management**: Automatic ATTRIBUTIONS.md generation
+- **5 External Packs Available**:
+  - `awesome-claude`: Curated Claude prompts (MIT, LangGPT)
+  - `claude-code-prompts`: System prompts for AI coding agents (MIT)
+  - `awesome-chatgpt`: World's largest prompt library (CC0)
+  - `prompt-engineering-guide`: DAIR.AI comprehensive guides (MIT)
+  - `anthropic-tutorial`: Official Anthropic tutorial (MIT)
+
+### 📦 New Modules
+
+| Module | Description |
+|--------|-------------|
+| `best_practices/` | YAML template loading and management |
+| `best_practices/schema.py` | Pydantic models for templates |
+| `best_practices/registry.yaml` | External template pack registry |
+| `template_matcher.py` | Template matching algorithm |
+| `template_registry.py` | Pack installation and management |
+| `prompt_enhancer.py` | Enhancement logic and result generation |
+
+### 📚 Templates Included
+
+| Category | Templates |
+|----------|-----------|
+| Debugging | Bug Fix, Type Error Fix, Performance Issue |
+| Implementation | Feature, API Endpoint, React Component |
+| Refactoring | Code Refactoring, Extract Function/Module |
+| Code Review | Comprehensive Review, Security-Focused Review |
+
+### 🔧 Changed
+- Added `pyyaml>=6.0` dependency for YAML parsing
+- Configured package data to include `.yaml` files in distribution
+
 ## [0.5.1] - 2026-01-24
 
 ### 🐛 Fixed

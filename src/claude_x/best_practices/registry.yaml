@@ -1,0 +1,169 @@
+# Template Pack Registry for claude-x
+# This file defines available template packs that can be installed via `cx templates install`
+
+version: "1.0"
+registry_url: "https://raw.githubusercontent.com/kakao-lucas-ms/claude-x/main/src/claude_x/best_practices/registry.yaml"
+
+packs:
+  # === CORE (bundled with claude-x) ===
+  - id: core
+    name: "Core Templates"
+    name_ko: "코어 템플릿"
+    description: "Essential templates for common development tasks"
+    description_ko: "일반적인 개발 작업을 위한 필수 템플릿"
+    source: bundled
+    license: MIT
+    author: claude-x
+    categories:
+      - debugging
+      - implementation
+      - refactoring
+      - code-review
+    template_count: 10
+    bundled: true
+
+  # === EXTERNAL PACKS ===
+  - id: awesome-claude
+    name: "Awesome Claude Prompts"
+    name_ko: "Awesome Claude 프롬프트"
+    description: "Curated Claude prompts with XML structure for 39% quality improvement"
+    description_ko: "XML 구조화로 39% 품질 향상된 큐레이션 Claude 프롬프트"
+    source: https://github.com/langgptai/awesome-claude-prompts
+    source_type: github
+    branch: main
+    path: prompts  # path within repo to look for templates
+    license: MIT
+    author: LangGPT
+    attribution: "Prompts from awesome-claude-prompts by LangGPT (MIT License)"
+    categories:
+      - general
+      - coding
+      - writing
+      - analysis
+    template_count: 50
+    bundled: false
+
+  - id: claude-code-prompts
+    name: "Claude Code Prompts"
+    name_ko: "Claude Code 프롬프트"
+    description: "System prompts optimized for AI coding agents"
+    description_ko: "AI 코딩 에이전트에 최적화된 시스템 프롬프트"
+    source: https://github.com/Rtur2003/Claude-Code-Promts
+    source_type: github
+    branch: main
+    path: prompts
+    license: MIT
+    author: Rtur2003
+    attribution: "Prompts from Claude-Code-Promts by Rtur2003 (MIT License)"
+    categories:
+      - coding
+      - agents
+      - debugging
+      - architecture
+    template_count: 30
+    bundled: false
+
+  - id: awesome-chatgpt
+    name: "Awesome ChatGPT Prompts"
+    name_ko: "Awesome ChatGPT 프롬프트"
+    description: "World's largest open-source prompt library (143k+ stars)"
+    description_ko: "세계 최대 오픈소스 프롬프트 라이브러리 (143k+ 스타)"
+    source: https://github.com/f/awesome-chatgpt-prompts
+    source_type: github
+    branch: main
+    path: prompts.csv
+    license: CC0
+    author: f
+    attribution: "Public domain prompts from awesome-chatgpt-prompts"
+    categories:
+      - general
+      - roleplay
+      - writing
+      - productivity
+    template_count: 150
+    bundled: false
+
+  - id: prompt-engineering-guide
+    name: "DAIR.AI Prompt Engineering"
+    name_ko: "DAIR.AI 프롬프트 엔지니어링"
+    description: "Comprehensive prompt engineering guides and examples"
+    description_ko: "종합적인 프롬프트 엔지니어링 가이드 및 예제"
+    source: https://github.com/dair-ai/Prompt-Engineering-Guide
+    source_type: github
+    branch: main
+    path: guides
+    license: MIT
+    author: DAIR.AI
+    attribution: "Guides from Prompt-Engineering-Guide by DAIR.AI (MIT License)"
+    categories:
+      - education
+      - techniques
+      - examples
+    template_count: 40
+    bundled: false
+
+  - id: anthropic-tutorial
+    name: "Anthropic Official Tutorial"
+    name_ko: "Anthropic 공식 튜토리얼"
+    description: "Official prompt engineering tutorial from Anthropic"
+    description_ko: "Anthropic 공식 프롬프트 엔지니어링 튜토리얼"
+    source: https://github.com/anthropics/prompt-eng-interactive-tutorial
+    source_type: github
+    branch: main
+    path: tutorials
+    license: MIT
+    author: Anthropic
+    attribution: "Tutorial from prompt-eng-interactive-tutorial by Anthropic (MIT License)"
+    categories:
+      - official
+      - education
+      - best-practices
+    template_count: 15
+    bundled: false
+
+# Category definitions
+categories:
+  debugging:
+    name: "Debugging"
+    name_ko: "디버깅"
+    icon: "🐛"
+  implementation:
+    name: "Implementation"
+    name_ko: "구현"
+    icon: "🔨"
+  refactoring:
+    name: "Refactoring"
+    name_ko: "리팩토링"
+    icon: "♻️"
+  code-review:
+    name: "Code Review"
+    name_ko: "코드 리뷰"
+    icon: "👀"
+  general:
+    name: "General"
+    name_ko: "일반"
+    icon: "📝"
+  coding:
+    name: "Coding"
+    name_ko: "코딩"
+    icon: "💻"
+  writing:
+    name: "Writing"
+    name_ko: "글쓰기"
+    icon: "✍️"
+  analysis:
+    name: "Analysis"
+    name_ko: "분석"
+    icon: "🔍"
+  agents:
+    name: "AI Agents"
+    name_ko: "AI 에이전트"
+    icon: "🤖"
+  education:
+    name: "Education"
+    name_ko: "교육"
+    icon: "📚"
+  official:
+    name: "Official"
+    name_ko: "공식"
+    icon: "✅"

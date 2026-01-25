@@ -1,0 +1,192 @@
+version: "1.0"
+category: "debugging"
+templates:
+  - id: "debug-001"
+    name: "Bug Fix with Error Context"
+    name_ko: "에러 컨텍스트 포함 버그 수정"
+    pattern_type: "debug_report"
+    intent: "fix"
+    triggers:
+      - "버그"
+      - "에러"
+      - "수정"
+      - "fix"
+      - "bug"
+      - "error"
+      - "오류"
+    template:
+      ko: |
+        @[FILE_PATH] 파일에서 발생하는 버그를 수정해줘.
+
+        ## 에러 메시지
+        ```
+        [ERROR_MESSAGE]
+        ```
+
+        ## 기대 동작
+        [EXPECTED_BEHAVIOR]
+
+        ## 실제 동작
+        [ACTUAL_BEHAVIOR]
+      en: |
+        Fix the bug in @[FILE_PATH].
+
+        ## Error Message
+        ```
+        [ERROR_MESSAGE]
+        ```
+
+        ## Expected Behavior
+        [EXPECTED_BEHAVIOR]
+
+        ## Actual Behavior
+        [ACTUAL_BEHAVIOR]
+    placeholders:
+      - name: "FILE_PATH"
+        description: "File where the bug occurs"
+        description_ko: "버그가 발생하는 파일"
+        required: true
+        example: "src/components/LoginForm.tsx"
+      - name: "ERROR_MESSAGE"
+        description: "Error message or stack trace"
+        description_ko: "에러 메시지 또는 스택 트레이스"
+        required: true
+        example: "TypeError: Cannot read property 'name' of undefined"
+      - name: "EXPECTED_BEHAVIOR"
+        description: "What should happen"
+        description_ko: "예상되는 동작"
+        required: false
+        example: "Form should submit successfully"
+      - name: "ACTUAL_BEHAVIOR"
+        description: "What actually happens"
+        description_ko: "실제 발생하는 동작"
+        required: false
+        example: "Application crashes on submit"
+    quality_boost: 4.0
+    tags:
+      - "debugging"
+      - "error"
+      - "fix"
+
+  - id: "debug-002"
+    name: "Type Error Fix"
+    name_ko: "타입 에러 수정"
+    pattern_type: "debug_report"
+    intent: "fix"
+    triggers:
+      - "타입"
+      - "type"
+      - "typescript"
+      - "타입스크립트"
+      - "type error"
+    template:
+      ko: |
+        @[FILE_PATH]에서 타입 에러를 수정해줘.
+
+        ## 에러 메시지
+        ```
+        [TYPE_ERROR]
+        ```
+
+        ## 관련 타입 정의
+        [RELATED_TYPES]
+      en: |
+        Fix the type error in @[FILE_PATH].
+
+        ## Error Message
+        ```
+        [TYPE_ERROR]
+        ```
+
+        ## Related Type Definitions
+        [RELATED_TYPES]
+    placeholders:
+      - name: "FILE_PATH"
+        description: "File with the type error"
+        description_ko: "타입 에러가 있는 파일"
+        required: true
+        example: "src/types/user.ts"
+      - name: "TYPE_ERROR"
+        description: "TypeScript error message"
+        description_ko: "타입스크립트 에러 메시지"
+        required: true
+        example: "Type 'string' is not assignable to type 'number'"
+      - name: "RELATED_TYPES"
+        description: "Related type definitions if any"
+        description_ko: "관련 타입 정의"
+        required: false
+        example: "interface User { id: number; name: string; }"
+    quality_boost: 3.5
+    tags:
+      - "typescript"
+      - "type"
+      - "debugging"
+
+  - id: "debug-003"
+    name: "Performance Issue Investigation"
+    name_ko: "성능 이슈 조사"
+    pattern_type: "context_goal"
+    intent: "fix"
+    triggers:
+      - "느려"
+      - "성능"
+      - "slow"
+      - "performance"
+      - "최적화"
+      - "optimize"
+    template:
+      ko: |
+        @[FILE_PATH]의 성능 문제를 분석하고 개선해줘.
+
+        ## 현재 상황
+        [CURRENT_SITUATION]
+
+        ## 성능 지표
+        - 현재: [CURRENT_METRIC]
+        - 목표: [TARGET_METRIC]
+
+        ## 의심되는 원인
+        [SUSPECTED_CAUSE]
+      en: |
+        Analyze and improve the performance issue in @[FILE_PATH].
+
+        ## Current Situation
+        [CURRENT_SITUATION]
+
+        ## Performance Metrics
+        - Current: [CURRENT_METRIC]
+        - Target: [TARGET_METRIC]
+
+        ## Suspected Cause
+        [SUSPECTED_CAUSE]
+    placeholders:
+      - name: "FILE_PATH"
+        description: "File with performance issue"
+        description_ko: "성능 문제가 있는 파일"
+        required: true
+        example: "src/components/DataTable.tsx"
+      - name: "CURRENT_SITUATION"
+        description: "Description of the performance issue"
+        description_ko: "성능 문제 설명"
+        required: true
+        example: "Table renders slowly with 1000+ rows"
+      - name: "CURRENT_METRIC"
+        description: "Current performance metric"
+        description_ko: "현재 성능 지표"
+        required: false
+        example: "3 seconds to render"
+      - name: "TARGET_METRIC"
+        description: "Target performance metric"
+        description_ko: "목표 성능 지표"
+        required: false
+        example: "Under 500ms"
+      - name: "SUSPECTED_CAUSE"
+        description: "What you think might be causing it"
+        description_ko: "의심되는 원인"
+        required: false
+        example: "Re-rendering on every state change"
+    quality_boost: 3.0
+    tags:
+      - "performance"
+      - "optimization"
+      - "debugging"

@@ -841,3 +841,137 @@ class PromptAnalytics:
             "top_sessions": self.get_top_sessions(project_name),
             "sensitive_data": self.get_sensitive_data_report(project_name)
         }
+
+    def find_similar_prompts(
+        self,
+        prompt: str,
+        intent: str,
+        project_name: Optional[str] = None,
+        limit: int = 3,
+        min_similarity: float = 0.2
+    ) -> List[Dict]:
+        """Find similar successful prompts from history.
+
+        Args:
+            prompt: Current prompt to find similar ones for
+            intent: Detected intent (fix, find, create, etc.)
+            project_name: Project name to search in
+            limit: Maximum number of similar prompts to return
+            min_similarity: Minimum similarity score (0-1)
+
+        Returns:
+            List of similar prompts with similarity scores and success metrics
+        """
+        # Get best prompts from history
+        best_prompts = self.get_best_prompts(
+            project_name=project_name,
+            limit=50,
+            min_structure=2.0,
+            min_context=0.0
+        )
+
+        if not best_prompts:
+            return []
+
+        # Extract keywords from current prompt
+        current_keywords = self._extract_keywords(prompt.lower())
+
+        similar = []
+        for p in best_prompts:
+            first_prompt = p.get("first_prompt", "")
+            if not first_prompt or len(first_prompt) < 10:
+                continue
+
+            # Calculate similarity
+            candidate_keywords = self._extract_keywords(first_prompt.lower())
+            similarity = self._calculate_keyword_similarity(current_keywords, candidate_keywords)
+
+            # Boost similarity if intent matches
+            candidate_intent = self._detect_simple_intent(first_prompt)
+            if candidate_intent == intent:
+                similarity += 0.2
+
+            if similarity >= min_similarity:
+                # Calculate success rate (fewer messages = more successful)
+                message_count = p.get("message_count", 10)
+                success_rate = max(0.5, 1.0 - (message_count - 2) * 0.1)  # 2 messages = 100%, 12+ = 50%
+
+                similar.append({
+                    "prompt": first_prompt,
+                    "similarity": round(similarity, 2),
+                    "success_rate": round(success_rate, 2),
+                    "message_count": message_count,
+                    "code_count": p.get("code_count", 0),
+                    "structure_score": p.get("structure_score", 0),
+                    "context_score": p.get("context_score", 0),
+                    "reason": self._generate_similarity_reason(intent, candidate_intent, similarity)
+                })
+
+        # Sort by success_rate * similarity
+        similar.sort(key=lambda x: x["success_rate"] * x["similarity"], reverse=True)
+        return similar[:limit]
+
+    def _extract_keywords(self, text: str) -> set:
+        """Extract meaningful keywords from text."""
+        import re
+        # Remove common stop words (Korean + English)
+        stop_words = {
+            "해줘", "해", "줘", "좀", "하고", "있는", "이", "그", "저", "를", "을", "에", "에서",
+            "the", "a", "an", "is", "are", "to", "for", "and", "or", "in", "on", "at",
+            "please", "can", "you", "i", "me", "my", "this", "that"
+        }
+
+        # Extract words (including Korean)
+        words = set(re.findall(r'[가-힣a-zA-Z0-9_./]+', text))
+
+        # Filter stop words and short words
+        keywords = {w for w in words if w not in stop_words and len(w) > 1}
+
+        return keywords
+
+    def _calculate_keyword_similarity(self, keywords1: set, keywords2: set) -> float:
+        """Calculate Jaccard similarity between two keyword sets."""
+        if not keywords1 or not keywords2:
+            return 0.0
+
+        intersection = keywords1 & keywords2
+        union = keywords1 | keywords2
+
+        return len(intersection) / len(union) if union else 0.0
+
+    def _detect_simple_intent(self, prompt: str) -> str:
+        """Detect simple intent from prompt text."""
+        prompt_lower = prompt.lower()
+
+        intent_keywords = {
+            "fix": ["수정", "고쳐", "fix", "bug", "에러", "error", "오류"],
+            "find": ["찾아", "검색", "확인", "find", "search", "어디", "where"],
+            "create": ["만들어", "생성", "추가", "create", "add", "new", "구현"],
+            "explain": ["설명", "뭐야", "알려", "explain", "what", "why", "how"],
+            "refactor": ["리팩토링", "개선", "정리", "refactor", "clean", "improve"],
+            "test": ["테스트", "검증", "test", "verify"]
+        }
+
+        for intent, keywords in intent_keywords.items():
+            if any(kw in prompt_lower for kw in keywords):
+                return intent
+
+        return "unknown"
+
+    def _generate_similarity_reason(self, current_intent: str, candidate_intent: str, similarity: float) -> str:
+        """Generate human-readable reason for similarity."""
+        reasons = []
+
+        if current_intent == candidate_intent and current_intent != "unknown":
+            intent_names = {
+                "fix": "버그 수정", "find": "검색", "create": "생성",
+                "explain": "설명", "refactor": "리팩토링", "test": "테스트"
+            }
+            reasons.append(f"같은 의도({intent_names.get(current_intent, current_intent)})")
+
+        if similarity >= 0.5:
+            reasons.append("키워드 유사도 높음")
+        elif similarity >= 0.3:
+            reasons.append("키워드 일부 일치")
+
+        return ", ".join(reasons) if reasons else "유사한 패턴"

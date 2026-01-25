@@ -18,6 +18,9 @@ from .patterns import (
     get_pattern_recommendations,
 )
 from .prompt_coach import PromptCoach
+from .prompt_enhancer import enhance_prompt as _enhance_prompt
+from .template_matcher import find_best_templates, get_quality_gap
+from .best_practices import load_templates, get_template_stats
 
 
 def get_storage() -> Storage:
@@ -344,6 +347,86 @@ def get_prompt_patterns(
     return result
 
 
+@mcp.tool()
+def enhance_prompt(
+    prompt: str,
+    template_id: Optional[str] = None,
+) -> dict:
+    """Enhance a prompt using best practice templates.
+
+    Use this when user requests prompt enhancement with triggers like:
+    - Korean: "고도화해서", "고도화", "개선해서", "더 좋게", "전문적으로"
+    - English: "enhance", "improve", "professional", "best practice"
+
+    Args:
+        prompt: User's input prompt (may include enhancement trigger)
+        template_id: Optional specific template ID to use (e.g., "debug-001")
+
+    Returns:
+        Dictionary containing:
+        - enhanced_prompt: The improved prompt with best practice structure
+        - template_used: ID of the template applied
+        - original_scores: Current quality scores
+        - expected_scores: Expected scores after enhancement
+        - improvement: Score improvements (structure, context)
+        - placeholders_remaining: Fields that need to be filled
+        - before_after_comparison: Visual comparison
+        - llm_summary: Human-readable summary
+        - auto_execute_hint: If true, prompt is ready to execute
+    """
+    result = _enhance_prompt(
+        prompt=prompt,
+        template_id=template_id,
+        auto_detect_trigger=True,
+    )
+    return result.to_dict()
+
+
+@mcp.tool()
+def list_enhancement_templates(
+    intent: Optional[str] = None,
+    limit: int = 10,
+) -> dict:
+    """List available prompt enhancement templates.
+
+    Args:
+        intent: Filter by intent (fix, create, explain, refactor, find, test)
+        limit: Maximum templates to return
+
+    Returns:
+        Dictionary containing available templates grouped by category
+    """
+    templates = load_templates()
+
+    if intent:
+        templates = [t for t in templates if t.intent == intent]
+
+    templates = templates[:limit]
+
+    result = {
+        "templates": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "name_ko": t.name_ko,
+                "intent": t.intent,
+                "triggers": t.triggers[:5],
+                "quality_boost": t.quality_boost,
+                "tags": t.tags,
+            }
+            for t in templates
+        ],
+        "stats": get_template_stats(),
+        "usage_guide": {
+            "triggers_ko": ["고도화해서", "고도화", "개선해서", "더 좋게", "전문적으로"],
+            "triggers_en": ["enhance", "improve", "professional", "best practice"],
+            "example": "버그 수정해줘 > 고도화해서",
+        },
+    }
+
+    return result
+
+
 def generate_llm_summary(result) -> str:
     """Generate a human-readable summary for LLM consumption."""
     lang = result.language
@@ -464,6 +547,43 @@ Recommended order:
                 summary += f"- {info['question']}{required}\n"
                 if info.get("example"):
                     summary += f"  Example: {info['example']}\n"
+
+    # v0.5.1: Add suggested prompts for interactive selection
+    if hasattr(result, 'suggested_prompts') and result.suggested_prompts:
+        if lang == "ko":
+            summary += """
+
+🔄 유사한 성공 프롬프트:
+"""
+            for opt in result.suggested_prompts:
+                success_pct = int(opt['success_rate'] * 100)
+                summary += f"""
+[옵션 {opt['index']}] (성공률: {success_pct}%)
+"{opt['display']}"
+- 이유: {opt['reason']}
+- 메시지: {opt['stats']['messages']}개, 코드: {opt['stats']['code']}개
+"""
+            summary += """
+💡 TIP: AskUserQuestion 도구로 사용자에게 위 옵션 중 하나를 선택하게 하거나,
+이 패턴을 참고하여 현재 프롬프트를 개선하세요.
+"""
+        else:
+            summary += """
+
+🔄 Similar successful prompts:
+"""
+            for opt in result.suggested_prompts:
+                success_pct = int(opt['success_rate'] * 100)
+                summary += f"""
+[Option {opt['index']}] (success rate: {success_pct}%)
+"{opt['display']}"
+- Reason: {opt['reason']}
+- Messages: {opt['stats']['messages']}, Code: {opt['stats']['code']}
+"""
+            summary += """
+💡 TIP: Use AskUserQuestion tool to let user choose one of these options,
+or use these patterns as reference to improve the current prompt.
+"""
 
     if result.extension_suggestion:
         ext = result.extension_suggestion

@@ -1,0 +1,117 @@
+version: "1.0"
+category: "review"
+templates:
+  - id: "review-001"
+    name: "Comprehensive Code Review"
+    name_ko: "종합 코드 리뷰"
+    pattern_type: "target_action"
+    intent: "explain"
+    triggers:
+      - "리뷰"
+      - "review"
+      - "검토"
+      - "코드리뷰"
+      - "code review"
+    template:
+      ko: |
+        @[FILE_PATH] 코드를 리뷰해줘.
+
+        ## 리뷰 관점
+        - 기능성: 요구사항 충족 여부
+        - 보안: 취약점 및 민감정보 노출
+        - 성능: 불필요한 연산, 메모리 누수
+        - 유지보수성: 가독성, 적절한 추상화
+        - 테스트: 테스트 커버리지, 테스트 용이성
+
+        ## 특히 확인할 부분
+        [FOCUS_AREAS]
+      en: |
+        Review the code in @[FILE_PATH].
+
+        ## Review Perspectives
+        - Functionality: Does it meet requirements?
+        - Security: Vulnerabilities and sensitive data exposure
+        - Performance: Unnecessary operations, memory leaks
+        - Maintainability: Readability, proper abstraction
+        - Testing: Test coverage, testability
+
+        ## Areas to Focus On
+        [FOCUS_AREAS]
+    placeholders:
+      - name: "FILE_PATH"
+        description: "File to review"
+        description_ko: "리뷰할 파일"
+        required: true
+        example: "src/api/auth.ts"
+      - name: "FOCUS_AREAS"
+        description: "Specific areas to focus on"
+        description_ko: "특히 확인할 부분"
+        required: false
+        example: "Authentication flow and token handling"
+    quality_boost: 4.0
+    tags:
+      - "review"
+      - "security"
+      - "quality"
+
+  - id: "review-002"
+    name: "Security-Focused Review"
+    name_ko: "보안 중심 리뷰"
+    pattern_type: "target_action"
+    intent: "explain"
+    triggers:
+      - "보안"
+      - "security"
+      - "취약점"
+      - "vulnerability"
+    template:
+      ko: |
+        @[FILE_PATH]의 보안 취약점을 검토해줘.
+
+        ## OWASP Top 10 체크리스트
+        - [ ] Injection (SQL, Command, etc.)
+        - [ ] Broken Authentication
+        - [ ] Sensitive Data Exposure
+        - [ ] XXE (XML External Entities)
+        - [ ] Broken Access Control
+        - [ ] Security Misconfiguration
+        - [ ] XSS (Cross-Site Scripting)
+        - [ ] Insecure Deserialization
+        - [ ] Using Components with Known Vulnerabilities
+        - [ ] Insufficient Logging & Monitoring
+
+        ## 특히 확인할 부분
+        [SECURITY_CONCERNS]
+      en: |
+        Review security vulnerabilities in @[FILE_PATH].
+
+        ## OWASP Top 10 Checklist
+        - [ ] Injection (SQL, Command, etc.)
+        - [ ] Broken Authentication
+        - [ ] Sensitive Data Exposure
+        - [ ] XXE (XML External Entities)
+        - [ ] Broken Access Control
+        - [ ] Security Misconfiguration
+        - [ ] XSS (Cross-Site Scripting)
+        - [ ] Insecure Deserialization
+        - [ ] Using Components with Known Vulnerabilities
+        - [ ] Insufficient Logging & Monitoring
+
+        ## Areas of Concern
+        [SECURITY_CONCERNS]
+    placeholders:
+      - name: "FILE_PATH"
+        description: "File to review for security"
+        description_ko: "보안 검토할 파일"
+        required: true
+        example: "src/api/auth.ts"
+      - name: "SECURITY_CONCERNS"
+        description: "Specific security concerns"
+        description_ko: "특정 보안 우려사항"
+        required: false
+        example: "User input validation and SQL queries"
+    quality_boost: 4.5
+    tags:
+      - "security"
+      - "owasp"
+      - "review"
