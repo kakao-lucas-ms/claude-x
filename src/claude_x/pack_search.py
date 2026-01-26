@@ -274,49 +274,64 @@ class PackSearchEngine:
     ) -> float:
         """Calculate relevance score for a document.
 
-        Scoring criteria:
-        - Exact phrase match in title: +10
-        - Exact phrase match in content: +5
-        - All query words in title: +8
-        - All query words in content: +4
-        - Individual word matches: +1 each (title) / +0.5 each (content)
-        - Minimum threshold: 3.0 for relevance
+        Scoring criteria (v0.6.5 - stricter matching):
+        - ALL query words must be present for high scores
+        - Partial matches get severely penalized
+        - Exact phrase match: bonus points
+        - Missing words: heavy penalty
+
+        Score thresholds:
+        - 10+: Excellent match (all words + exact phrase)
+        - 6-10: Good match (all words present)
+        - 2-6: Partial match (some words missing)
+        - <2: Filtered out
         """
         score = 0.0
 
         content_lower = doc['content'].lower()
         title_lower = doc['title'].lower()
+        combined_text = title_lower + " " + content_lower
+
+        if not query_words:
+            return 0.0
+
+        # Count how many query words are present
+        words_in_title = sum(1 for w in query_words if w in title_lower)
+        words_in_content = sum(1 for w in query_words if w in content_lower)
+        words_in_combined = sum(1 for w in query_words if w in combined_text)
+
+        total_words = len(query_words)
+        match_ratio = words_in_combined / total_words
+
+        # CRITICAL: If not all words are present, apply heavy penalty
+        if match_ratio < 1.0:
+            # Partial match - severely reduced score
+            # Missing even 1 word out of 3 = only 33% of potential score
+            penalty_factor = match_ratio ** 2  # Quadratic penalty
+            base_score = words_in_combined * 1.5
+            score = base_score * penalty_factor
+            # Cap partial matches at low score
+            return min(score, 3.0)
+
+        # ALL words are present - calculate full score
+        score = 5.0  # Base score for having all words
 
         # Exact phrase match (highest priority)
         if len(query_lower) > 3:
             if query_lower in title_lower:
-                score += 10.0
+                score += 8.0  # Exact phrase in title
             elif query_lower in content_lower:
-                score += 5.0
+                score += 4.0  # Exact phrase in content
 
-        # Check if ALL query words appear
-        if query_words:
-            title_word_matches = sum(1 for w in query_words if w in title_lower)
-            content_word_matches = sum(1 for w in query_words if w in content_lower)
-
-            # All words in title = highly relevant
-            if title_word_matches == len(query_words):
-                score += 8.0
-            elif title_word_matches > 0:
-                score += title_word_matches * 1.5
-
-            # All words in content
-            if content_word_matches == len(query_words):
-                score += 4.0
-            elif content_word_matches > 0:
-                # Partial matches - less weight
-                score += content_word_matches * 0.5
+        # All words in title = extra bonus
+        if words_in_title == total_words:
+            score += 3.0
 
         # Density bonus: how concentrated are the matches?
-        if query_words and len(content_lower) > 0:
-            total_matches = sum(content_lower.count(w) for w in query_words)
-            density = total_matches / (len(content_lower) / 100)  # matches per 100 chars
-            score += min(density * 0.5, 2.0)  # Cap density bonus
+        if len(content_lower) > 0:
+            total_occurrences = sum(content_lower.count(w) for w in query_words)
+            density = total_occurrences / (len(content_lower) / 100)
+            score += min(density * 0.3, 1.5)
 
         return score
 
