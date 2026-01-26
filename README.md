@@ -1,9 +1,11 @@
-# Claude-X (cx)
+# Claude-X (cx) v0.6.0
 
 > **Second Brain and Command Center for Claude Code**
 >
 > Claude Code의 모든 대화 히스토리를 검색 가능한 데이터베이스로 전환하고,
 > 프롬프트 사용 패턴을 분석하여 개인 지식 자산으로 만드는 도구입니다.
+>
+> **v0.6.0 NEW**: 외부 베스트 프랙티스 팩 + 프롬프트 고도화 기능 추가!
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -38,14 +40,42 @@
 - 개선 제안 및 예상 효과 계산
 - 확장 시스템 명령어 추천
 
+### 6. 📦 외부 템플릿 팩 (NEW in v0.6.0)
+- 5개의 외부 베스트 프랙티스 팩 레지스트리
+- `cx packs` 명령어로 설치/관리
+- 팩별 독립적인 설치 및 업데이트
+- RAG 스타일 하이브리드 검색
+
+### 7. ✨ 프롬프트 고도화 (NEW in v0.6.0)
+- "고도화해서", "enhance" 등 트리거로 프롬프트 개선
+- 23개의 핵심 템플릿 (debugging, coding, refactoring, documentation)
+- 외부 팩에서 관련 베스트 프랙티스 자동 참조
+- Before/After 비교 및 개선 점수 표시
+
 ## 📦 설치
 
 ### 요구사항
-- Python 3.13+
+- Python 3.10+
 - Claude Code CLI (설치되어 있어야 함)
 
 ### 설치 방법
 
+**Option 1: PyPI에서 설치 (권장)**
+```bash
+# pip으로 설치
+pip install claude-x
+
+# 데이터베이스 초기화
+cx init
+
+# 세션 데이터 가져오기
+cx import
+
+# (선택) 외부 팩 설치
+cx packs install all
+```
+
+**Option 2: 소스에서 설치**
 ```bash
 # 1. 저장소 클론
 cd ~/workspace
@@ -88,6 +118,11 @@ cx coach "응 진행해줘"
 
 # 8. 템플릿 라이브러리
 cx templates
+
+# 9. 외부 팩 관리 (v0.6.0)
+cx packs list              # 사용 가능한 팩 목록
+cx packs install all       # 모든 팩 설치
+cx packs installed         # 설치된 팩 확인
 ```
 
 ## 📖 상세 사용법
@@ -429,6 +464,50 @@ cx stats
 
 ---
 
+### cx packs (v0.6.0)
+외부 베스트 프랙티스 팩 관리
+
+```bash
+# 사용 가능한 팩 목록
+cx packs list
+
+# 특정 팩 설치
+cx packs install awesome-claude
+
+# 모든 팩 한번에 설치
+cx packs install all
+
+# 설치된 팩 확인
+cx packs installed
+
+# 팩 상세 정보
+cx packs info awesome-claude
+
+# 팩 제거
+cx packs remove awesome-claude
+```
+
+**사용 가능한 팩:**
+
+| 팩 ID | 이름 | 문서 수 | 설명 |
+|-------|------|--------|------|
+| `awesome-claude` | Anthropic Claude Prompting | 156 | Claude 공식 프롬프팅 가이드 |
+| `claude-code-prompts` | Claude Code Prompts | 35 | Claude Code 전용 프롬프트 |
+| `awesome-chatgpt` | Awesome ChatGPT Prompts | 10 | 범용 프롬프트 컬렉션 |
+| `prompt-engineering-guide` | DAIR.AI Prompt Guide | 76 | 프롬프트 엔지니어링 교육 |
+| `anthropic-tutorial` | Anthropic Tutorial | - | Claude API 튜토리얼 |
+
+**팩 데이터 저장 위치:**
+```
+~/.claude-x/best_practices/
+├── installed.json           # 설치된 팩 메타데이터
+├── awesome-claude/          # 각 팩별 디렉토리
+├── claude-code-prompts/
+└── ...
+```
+
+---
+
 ## 🔌 MCP Server Integration
 
 Claude-X는 MCP(Model Context Protocol) 서버를 제공하여 Claude Code에서 직접 데이터를 조회할 수 있습니다.
@@ -468,6 +547,12 @@ User: "내 프롬프트 사용 패턴을 분석해줘"
 
 User: "좋은 프롬프트 예시 보여줘"
 → get_best_prompts MCP tool 자동 호출
+
+# 프롬프트 고도화 (v0.6.0)
+User: "로그인 API 만들어줘 > 고도화해서"
+→ enhance_prompt MCP tool 호출
+→ 전문적인 API 구현 템플릿 적용
+→ 외부 팩에서 관련 베스트 프랙티스 참조
 ```
 
 #### 4. `analyze_and_improve_prompt`
@@ -477,6 +562,39 @@ User: "좋은 프롬프트 예시 보여줘"
 - 구조/맥락 점수 산출
 - 개선안과 예상 효과 제공
 - 확장 명령어 추천 (설치된 경우)
+
+#### 5. `enhance_prompt` (NEW in v0.6.0)
+프롬프트 고도화 - 베스트 프랙티스 템플릿 적용
+
+**트리거 키워드:**
+- 한국어: "고도화해서", "고도화", "개선해서", "더 좋게", "전문적으로"
+- 영어: "enhance", "improve", "professional", "best practice"
+
+**사용 예시:**
+```
+User: "버그 수정해줘 > 고도화해서"
+→ enhance_prompt MCP tool 자동 호출
+
+User: "React 컴포넌트 만들어줘 enhance"
+→ 전문적인 구조의 프롬프트로 변환
+```
+
+**반환 데이터:**
+- `enhanced_prompt`: 고도화된 프롬프트
+- `template_used`: 적용된 템플릿 ID
+- `original_scores` / `expected_scores`: 점수 비교
+- `before_after_comparison`: 시각적 비교
+- `external_references`: 외부 팩에서 가져온 관련 예시
+- `auto_execute_hint`: 바로 실행 가능 여부
+
+#### 6. `list_enhancement_templates` (NEW in v0.6.0)
+사용 가능한 고도화 템플릿 목록 조회
+
+**템플릿 카테고리:**
+- `debugging` (6개): 버그 수정, 에러 분석
+- `coding` (8개): 기능 구현, API 개발
+- `refactoring` (5개): 코드 개선, 성능 최적화
+- `documentation` (4개): 문서화, 주석 작성
 
 ---
 
@@ -496,7 +614,19 @@ claude-x/
 │   ├── security.py         # 민감 정보 검출 (14개 패턴)
 │   ├── storage.py          # SQLite + FTS5 backend
 │   ├── analytics.py        # 프롬프트 분석 엔진
-│   └── prompt_templates.py # 템플릿 라이브러리
+│   ├── prompt_templates.py # 템플릿 라이브러리
+│   ├── prompt_coach.py     # 프롬프트 코칭 (v0.4.0)
+│   ├── mcp_server.py       # MCP 서버
+│   ├── template_matcher.py # 템플릿 매칭 엔진 (v0.6.0)
+│   ├── prompt_enhancer.py  # 프롬프트 고도화 (v0.6.0)
+│   ├── template_registry.py # 외부 팩 레지스트리 (v0.6.0)
+│   ├── pack_search.py      # RAG 스타일 팩 검색 (v0.6.0)
+│   └── best_practices/     # 핵심 템플릿 YAML (v0.6.0)
+│       ├── schema.py
+│       ├── coding_patterns.yaml
+│       ├── debugging.yaml
+│       ├── refactoring.yaml
+│       └── documentation.yaml
 ├── pyproject.toml
 └── README.md
 ```
@@ -511,6 +641,24 @@ claude-x/
 │       └── abc123.jsonl       3. 코드 추출         │   └── front-prompts.md
 ├── project2/                  4. 민감정보 검출     ├── prompt-templates.md
 │   └── ...                    5. DB 저장           └── my-best-prompts.md
+```
+
+### 프롬프트 고도화 흐름 (v0.6.0)
+
+```
+사용자 입력                    Hybrid RAG 처리               출력
+"버그 수정해줘               ┌─────────────────────┐       고도화된 프롬프트
+ > 고도화해서"   ─────────>  │ 1. 트리거 감지       │ ────> + 템플릿 적용
+                            │ 2. Intent 분석       │       + 플레이스홀더
+                            │ 3. 템플릿 매칭       │       + 외부 참조
+                            │ 4. 팩 RAG 검색       │       + Before/After
+                            └─────────────────────┘
+                                     │
+                    ┌────────────────┼────────────────┐
+                    ▼                ▼                ▼
+              Core Templates   External Packs   User History
+              (23개 YAML)      (5개 팩, 277+     (세션 분석)
+                               문서)
 ```
 
 ### 데이터베이스 스키마
@@ -579,10 +727,12 @@ CREATE VIRTUAL TABLE code_fts USING fts5(
 
 ### 주요 기술 스택
 
-- **Python 3.13** - 최신 Python 기능 활용
+- **Python 3.10+** - Python 기능 활용
 - **SQLite + FTS5** - 빠른 full-text search
 - **Pydantic** - 타입 안전 데이터 검증
 - **Typer + Rich** - 아름다운 CLI 인터페이스
+- **PyYAML** - 템플릿 YAML 파싱 (v0.6.0)
+- **Requests** - 외부 팩 다운로드 (v0.6.0)
 - **uv** - 빠른 패키지 관리
 
 ---
