@@ -1,6 +1,6 @@
 {
   "name": "claude-x",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Second Brain for Claude Code - Prompt analytics, session insights, and productivity tools",
   "author": {
     "name": "lucas.ms",
