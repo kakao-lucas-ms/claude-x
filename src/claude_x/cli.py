@@ -1602,6 +1602,8 @@ def packs_search_cmd(
     query: str = typer.Argument(..., help="Search query for best practices"),
     limit: int = typer.Option(5, "--limit", "-l", help="Maximum results to show"),
     pack_id: Optional[str] = typer.Option(None, "--pack", "-p", help="Filter by specific pack"),
+    show: Optional[int] = typer.Option(None, "--show", "-s", help="Show full content of result N"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show longer previews"),
 ):
     """Search best practices across installed packs.
 
@@ -1609,8 +1611,12 @@ def packs_search_cmd(
         cx packs search "error handling"
         cx packs search "react component" --limit 10
         cx packs search "api design" --pack awesome-claude
+        cx packs search "debugging" --show 1    # Show full content of result 1
+        cx packs search "testing" --verbose     # Show longer previews
     """
-    from .pack_search import search_packs, get_pack_search_stats
+    from .pack_search import search_packs, get_pack_search_stats, get_search_engine
+    from rich.panel import Panel
+    from rich.markdown import Markdown
 
     # 먼저 통계 확인
     stats = get_pack_search_stats()
@@ -1628,26 +1634,65 @@ def packs_search_cmd(
         console.print("[dim]Try different keywords or install more packs.[/dim]")
         return
 
+    # --show 옵션: 특정 결과의 전체 내용 표시
+    if show is not None:
+        if show < 1 or show > len(results):
+            console.print(f"[red]Invalid result number. Choose 1-{len(results)}[/red]")
+            return
+
+        result = results[show - 1]
+
+        # 전체 문서 내용 가져오기
+        engine = get_search_engine()
+        full_content = None
+        for idx in engine.indices.values():
+            for doc in idx.documents:
+                if doc['title'] == result.title:
+                    full_content = doc['content']
+                    break
+
+        console.print(f"\n[bold cyan]📄 {result.title}[/bold cyan]")
+        console.print(f"[dim]📦 {result.pack_name} | {result.source_url}[/dim]\n")
+
+        if full_content:
+            # 마크다운으로 렌더링
+            console.print(Panel(Markdown(full_content), border_style="dim"))
+        else:
+            console.print(result.content)
+
+        console.print(f"\n[dim]💡 Copy this prompt and customize the [PLACEHOLDERS] for your use case[/dim]")
+        return
+
+    # 일반 검색 결과 표시
     console.print(f"\n[bold cyan]🔍 Search Results for '{query}'[/bold cyan]")
     console.print(f"[dim]Found {len(results)} results from {stats['total_documents']} documents[/dim]\n")
+
+    preview_length = 500 if verbose else 300
 
     for i, result in enumerate(results, 1):
         # 제목과 팩 이름
         console.print(f"[bold]{i}. {result.title}[/bold]")
         console.print(f"   [cyan]📦 {result.pack_name}[/cyan] | Score: {result.score:.1f}")
 
-        # 내용 미리보기 (처음 200자)
-        preview = result.content[:200].replace("\n", " ").strip()
-        if len(result.content) > 200:
+        # 내용 미리보기
+        preview = result.content[:preview_length].strip()
+        if len(result.content) > preview_length:
             preview += "..."
-        console.print(f"   [dim]{preview}[/dim]")
 
-        # 소스 URL (있는 경우)
+        # 줄바꿈 유지하되 들여쓰기 추가
+        preview_lines = preview.split("\n")
+        for line in preview_lines[:8]:  # 최대 8줄
+            console.print(f"   [dim]{line}[/dim]")
+        if len(preview_lines) > 8:
+            console.print(f"   [dim]...[/dim]")
+
+        # 소스 URL
         if result.source_url:
             console.print(f"   [blue]🔗 {result.source_url}[/blue]")
 
         console.print()
 
+    console.print("[dim]💡 Use --show N to see full content (e.g., cx packs search \"query\" --show 1)[/dim]")
     console.print("[dim]💡 Use '> 고도화해서' in Claude Code to apply best practices automatically[/dim]")
 
 
