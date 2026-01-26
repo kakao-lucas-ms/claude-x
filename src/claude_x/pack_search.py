@@ -136,30 +136,23 @@ class PackSearchEngine:
         return documents
 
     def _extract_keywords(self, text: str) -> List[str]:
-        """Extract keywords from text for matching."""
-        # Common programming terms and patterns
-        keywords = []
-
-        # Extract code-related terms
-        code_patterns = [
-            r'\b(api|endpoint|route|http|rest|graphql)\b',
-            r'\b(bug|fix|error|exception|debug)\b',
-            r'\b(test|testing|unit|integration)\b',
-            r'\b(refactor|clean|optimize|performance)\b',
-            r'\b(component|react|vue|angular)\b',
-            r'\b(function|class|method|module)\b',
-            r'\b(database|sql|query|migration)\b',
-            r'\b(auth|login|session|token|jwt)\b',
-            r'\b(deploy|ci|cd|docker|kubernetes)\b',
-            r'\b(prompt|template|example|pattern)\b',
-        ]
+        """Extract meaningful keywords from text."""
+        # Extract all significant words (3+ chars, not stopwords)
+        stopwords = {
+            'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can',
+            'had', 'her', 'was', 'one', 'our', 'out', 'has', 'have', 'been',
+            'would', 'could', 'should', 'will', 'with', 'this', 'that', 'from',
+            'they', 'what', 'when', 'where', 'which', 'who', 'how', 'why',
+            'each', 'she', 'use', 'used', 'using', 'like', 'make', 'made',
+            'just', 'into', 'than', 'then', 'them', 'some', 'such', 'only',
+            'also', 'more', 'most', 'other', 'your', 'about', 'these', 'those',
+        }
 
         text_lower = text.lower()
-        for pattern in code_patterns:
-            matches = re.findall(pattern, text_lower)
-            keywords.extend(matches)
+        words = re.findall(r'\b[a-z]{3,}\b', text_lower)
+        keywords = [w for w in words if w not in stopwords]
 
-        return list(set(keywords))
+        return keywords
 
     def search(
         self,
@@ -184,6 +177,9 @@ class PackSearchEngine:
         # Also extract words from query
         query_words = set(re.findall(r'\b\w{3,}\b', query_lower))
 
+        # Minimum score threshold for relevance
+        MIN_SCORE = 2.0
+
         for pack_id, index in self.indices.items():
             if pack_ids and pack_id not in pack_ids:
                 continue
@@ -196,13 +192,18 @@ class PackSearchEngine:
                     doc,
                 )
 
-                if score > 0:
+                # Only include results above threshold
+                if score >= MIN_SCORE:
+                    # Extract relevant snippet around query terms
+                    snippet = self._extract_relevant_snippet(
+                        doc['content'], query_lower, query_words
+                    )
                     results.append(SearchResult(
                         pack_id=pack_id,
                         pack_name=index.pack_name,
                         file_name=doc['file'],
                         title=doc['title'],
-                        content=doc['content'][:500],  # Truncate
+                        content=snippet,
                         score=score,
                         source_url=index.source_url,
                     ))
@@ -211,6 +212,51 @@ class PackSearchEngine:
         results.sort(key=lambda x: x.score, reverse=True)
         return results[:limit]
 
+    def _extract_relevant_snippet(
+        self,
+        content: str,
+        query_lower: str,
+        query_words: set,
+        max_length: int = 300,
+    ) -> str:
+        """Extract a snippet that shows the relevant context around query terms."""
+        content_lower = content.lower()
+
+        # Try to find exact phrase first
+        if query_lower in content_lower:
+            idx = content_lower.find(query_lower)
+            start = max(0, idx - 50)
+            end = min(len(content), idx + len(query_lower) + 200)
+            snippet = content[start:end]
+            if start > 0:
+                snippet = "..." + snippet
+            if end < len(content):
+                snippet = snippet + "..."
+            return snippet
+
+        # Find the best position where query words cluster
+        best_pos = 0
+        best_score = 0
+
+        for i in range(0, len(content_lower), 50):
+            window = content_lower[i:i+300]
+            score = sum(1 for w in query_words if w in window)
+            if score > best_score:
+                best_score = score
+                best_pos = i
+
+        if best_score > 0:
+            end = min(len(content), best_pos + max_length)
+            snippet = content[best_pos:end]
+            if best_pos > 0:
+                snippet = "..." + snippet
+            if end < len(content):
+                snippet = snippet + "..."
+            return snippet
+
+        # Fallback to beginning
+        return content[:max_length] + ("..." if len(content) > max_length else "")
+
     def _calculate_score(
         self,
         query_lower: str,
@@ -218,31 +264,51 @@ class PackSearchEngine:
         query_words: set,
         doc: Dict[str, Any],
     ) -> float:
-        """Calculate relevance score for a document."""
+        """Calculate relevance score for a document.
+
+        Scoring criteria:
+        - Exact phrase match in title: +10
+        - Exact phrase match in content: +5
+        - All query words in title: +8
+        - All query words in content: +4
+        - Individual word matches: +1 each (title) / +0.5 each (content)
+        - Minimum threshold: 3.0 for relevance
+        """
         score = 0.0
 
         content_lower = doc['content'].lower()
         title_lower = doc['title'].lower()
-        doc_keywords = set(doc.get('keywords', []))
 
-        # Keyword match (highest weight)
-        keyword_matches = len(set(query_keywords) & doc_keywords)
-        score += keyword_matches * 3.0
+        # Exact phrase match (highest priority)
+        if len(query_lower) > 3:
+            if query_lower in title_lower:
+                score += 10.0
+            elif query_lower in content_lower:
+                score += 5.0
 
-        # Title match
-        for word in query_words:
-            if word in title_lower:
-                score += 2.0
+        # Check if ALL query words appear
+        if query_words:
+            title_word_matches = sum(1 for w in query_words if w in title_lower)
+            content_word_matches = sum(1 for w in query_words if w in content_lower)
 
-        # Content match
-        for word in query_words:
-            if word in content_lower:
-                count = content_lower.count(word)
-                score += min(count * 0.5, 2.0)  # Cap at 2.0
+            # All words in title = highly relevant
+            if title_word_matches == len(query_words):
+                score += 8.0
+            elif title_word_matches > 0:
+                score += title_word_matches * 1.5
 
-        # Exact phrase match (bonus)
-        if len(query_lower) > 5 and query_lower in content_lower:
-            score += 3.0
+            # All words in content
+            if content_word_matches == len(query_words):
+                score += 4.0
+            elif content_word_matches > 0:
+                # Partial matches - less weight
+                score += content_word_matches * 0.5
+
+        # Density bonus: how concentrated are the matches?
+        if query_words and len(content_lower) > 0:
+            total_matches = sum(content_lower.count(w) for w in query_words)
+            density = total_matches / (len(content_lower) / 100)  # matches per 100 chars
+            score += min(density * 0.5, 2.0)  # Cap density bonus
 
         return score
 
