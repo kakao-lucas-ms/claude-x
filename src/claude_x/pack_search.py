@@ -217,21 +217,33 @@ class PackSearchEngine:
         content: str,
         query_lower: str,
         query_words: set,
-        max_length: int = 300,
+        max_length: int = 600,
     ) -> str:
-        """Extract a snippet that shows the relevant context around query terms."""
+        """Extract a snippet that shows the relevant context around query terms.
+
+        Returns longer snippets (600 chars) for better context.
+        Minimizes use of "..." to avoid messy output.
+        """
         content_lower = content.lower()
+
+        # Short content: return as-is
+        if len(content) <= max_length:
+            return content.strip()
 
         # Try to find exact phrase first
         if query_lower in content_lower:
             idx = content_lower.find(query_lower)
-            start = max(0, idx - 50)
-            end = min(len(content), idx + len(query_lower) + 200)
-            snippet = content[start:end]
+            # Get more context around the match
+            start = max(0, idx - 100)
+            end = min(len(content), idx + len(query_lower) + 400)
+
+            # Align to word boundaries
             if start > 0:
-                snippet = "..." + snippet
-            if end < len(content):
-                snippet = snippet + "..."
+                space_idx = content.find(' ', start)
+                if space_idx != -1 and space_idx < start + 20:
+                    start = space_idx + 1
+
+            snippet = content[start:end].strip()
             return snippet
 
         # Find the best position where query words cluster
@@ -239,7 +251,7 @@ class PackSearchEngine:
         best_score = 0
 
         for i in range(0, len(content_lower), 50):
-            window = content_lower[i:i+300]
+            window = content_lower[i:i+max_length]
             score = sum(1 for w in query_words if w in window)
             if score > best_score:
                 best_score = score
@@ -247,15 +259,11 @@ class PackSearchEngine:
 
         if best_score > 0:
             end = min(len(content), best_pos + max_length)
-            snippet = content[best_pos:end]
-            if best_pos > 0:
-                snippet = "..." + snippet
-            if end < len(content):
-                snippet = snippet + "..."
+            snippet = content[best_pos:end].strip()
             return snippet
 
         # Fallback to beginning
-        return content[:max_length] + ("..." if len(content) > max_length else "")
+        return content[:max_length].strip()
 
     def _calculate_score(
         self,

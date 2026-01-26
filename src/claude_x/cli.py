@@ -1667,24 +1667,56 @@ def packs_search_cmd(
     console.print(f"\n[bold cyan]🔍 Search Results for '{query}'[/bold cyan]")
     console.print(f"[dim]Found {len(results)} results from {stats['total_documents']} documents[/dim]\n")
 
-    preview_length = 500 if verbose else 300
+    # 전체 문서 내용을 가져와서 표시
+    engine = get_search_engine()
 
     for i, result in enumerate(results, 1):
         # 제목과 팩 이름
         console.print(f"[bold]{i}. {result.title}[/bold]")
         console.print(f"   [cyan]📦 {result.pack_name}[/cyan] | Score: {result.score:.1f}")
 
-        # 내용 미리보기
-        preview = result.content[:preview_length].strip()
-        if len(result.content) > preview_length:
-            preview += "..."
+        # 전체 문서 내용 가져오기
+        full_content = None
+        for idx in engine.indices.values():
+            for doc in idx.documents:
+                if doc['title'] == result.title and doc['file'] == result.file_name:
+                    full_content = doc['content']
+                    break
+            if full_content:
+                break
+
+        content = full_content or result.content
+
+        if verbose:
+            # --verbose: 전체 내용 또는 1000자까지 표시
+            max_chars = 1000
+            max_lines = 20
+        else:
+            # 기본: 600자, 12줄까지 표시 (이전보다 2배)
+            max_chars = 600
+            max_lines = 12
+
+        # 내용 미리보기 (... 제거, 깔끔하게)
+        preview = content.strip()
+
+        # 앞쪽 ... 제거
+        if preview.startswith("..."):
+            preview = preview[3:].strip()
+
+        # 글자 수 제한
+        truncated = False
+        if len(preview) > max_chars:
+            preview = preview[:max_chars]
+            truncated = True
 
         # 줄바꿈 유지하되 들여쓰기 추가
         preview_lines = preview.split("\n")
-        for line in preview_lines[:8]:  # 최대 8줄
+        display_lines = preview_lines[:max_lines]
+        for line in display_lines:
             console.print(f"   [dim]{line}[/dim]")
-        if len(preview_lines) > 8:
-            console.print(f"   [dim]...[/dim]")
+
+        if len(preview_lines) > max_lines or truncated:
+            console.print(f"   [yellow]... (--show {i} for full content)[/yellow]")
 
         # 소스 URL
         if result.source_url:
@@ -1692,8 +1724,7 @@ def packs_search_cmd(
 
         console.print()
 
-    console.print("[dim]💡 Use --show N to see full content (e.g., cx packs search \"query\" --show 1)[/dim]")
-    console.print("[dim]💡 Use '> 고도화해서' in Claude Code to apply best practices automatically[/dim]")
+    console.print("[dim]💡 Use --show N to see full content (e.g., cx packs search \"debugging\" --show 1)[/dim]")
 
 
 def main():
