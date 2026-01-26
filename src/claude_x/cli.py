@@ -1597,6 +1597,60 @@ def packs_info_cmd(
         console.print(f"[dim]💡 Install with: cx packs install {pack.id}[/dim]")
 
 
+@packs_app.command("search")
+def packs_search_cmd(
+    query: str = typer.Argument(..., help="Search query for best practices"),
+    limit: int = typer.Option(5, "--limit", "-l", help="Maximum results to show"),
+    pack_id: Optional[str] = typer.Option(None, "--pack", "-p", help="Filter by specific pack"),
+):
+    """Search best practices across installed packs.
+
+    Examples:
+        cx packs search "error handling"
+        cx packs search "react component" --limit 10
+        cx packs search "api design" --pack awesome-claude
+    """
+    from .pack_search import search_packs, get_pack_search_stats
+
+    # 먼저 통계 확인
+    stats = get_pack_search_stats()
+    if stats["total_documents"] == 0:
+        console.print("[yellow]No documents indexed. Install packs first:[/yellow]")
+        console.print("[dim]  cx packs install all[/dim]")
+        return
+
+    # 검색 실행
+    pack_ids = [pack_id] if pack_id else None
+    results = search_packs(query, limit=limit, pack_ids=pack_ids)
+
+    if not results:
+        console.print(f"[yellow]No results found for '{query}'[/yellow]")
+        console.print("[dim]Try different keywords or install more packs.[/dim]")
+        return
+
+    console.print(f"\n[bold cyan]🔍 Search Results for '{query}'[/bold cyan]")
+    console.print(f"[dim]Found {len(results)} results from {stats['total_documents']} documents[/dim]\n")
+
+    for i, result in enumerate(results, 1):
+        # 제목과 팩 이름
+        console.print(f"[bold]{i}. {result.title}[/bold]")
+        console.print(f"   [cyan]📦 {result.pack_name}[/cyan] | Score: {result.score:.1f}")
+
+        # 내용 미리보기 (처음 200자)
+        preview = result.content[:200].replace("\n", " ").strip()
+        if len(result.content) > 200:
+            preview += "..."
+        console.print(f"   [dim]{preview}[/dim]")
+
+        # 소스 URL (있는 경우)
+        if result.source_url:
+            console.print(f"   [blue]🔗 {result.source_url}[/blue]")
+
+        console.print()
+
+    console.print("[dim]💡 Use '> 고도화해서' in Claude Code to apply best practices automatically[/dim]")
+
+
 def main():
     """Entry point."""
     app()
